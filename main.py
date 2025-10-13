@@ -5,100 +5,80 @@ import streamlit as st
 from google import genai
 from google.genai import errors
 
-# ===================== ตั้งค่าพื้นฐาน & ธีมมือถือ =====================
-st.set_page_config(page_title="ตรวจทรงผมนักเรียน", page_icon="✂️", layout="wide")
+# ===================== Page setup =====================
+st.set_page_config(page_title="Student Hair Check", page_icon="✂️", layout="wide")
 
-MOBILE_CSS = """
+# ---- CSS (Lens-like, minimal, mobile-first) ----
+CSS = """
 <style>
-...
+/* Base */
+html, body, [class*="css"] { font-size: 18px; }
+div.block-container { padding-top: .4rem; padding-bottom: 2rem; }
+
+/* Top bar */
+.topbar { display:flex; align-items:center; justify-content:space-between;
+  gap:12px; padding:.4rem .2rem .6rem .2rem; }
+.brand { font-weight:800; font-size:1.2rem; letter-spacing:.2px; }
+.gear-wrap { display:flex; gap:8px; align-items:center; }
+
+/* Gear button */
+.stButton > button.gear {
+  width:auto; padding:.55rem .7rem; border-radius:12px; font-size:1.05rem;
+  background:#f1f5f9 !important; color:#0f172a !important; border:none !important;
+}
+.stButton > button.gear:hover { background:#e2e8f0 !important; }
+
+/* Primary / Secondary buttons */
+.stButton > button.primary {
+  width:100%; padding:1.0rem 1.1rem; font-size:1.12rem; font-weight:700;
+  border-radius:14px; background:#2563eb !important; color:#fff !important; border:none !important;
+}
+.stButton > button.primary:hover { background:#1e40af !important; }
+.stButton > button.secondary {
+  width:100%; padding:1.0rem 1.1rem; font-size:1.02rem; font-weight:700;
+  border-radius:14px; background:#e2e8f0 !important; color:#0f172a !important; border:none !important;
+}
+.stButton > button.secondary:hover { background:#cbd5e1 !important; }
+
+/* Camera label */
+[data-testid="stCameraInputLabel"] { font-size:1.05rem; }
+
+/* Result card */
 .result-card {
-  border-radius: 16px;
-  padding: 1rem 1.1rem;
-  margin-top: 0.6rem;
-  border: 1px solid rgba(0,0,0,0.08);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-  background: #fff;
+  border-radius:16px; padding:1rem 1.1rem; margin-top:.6rem;
+  border:1px solid rgba(0,0,0,.08); box-shadow:0 2px 10px rgba(0,0,0,.06);
+  background:#fff;
 }
-/* เพิ่มบรรทัดเหล่านี้ */
-.result-card,
-.result-card * { color: #0f172a !important; }
-.result-card hr { border-color: rgba(0,0,0,0.12) !important; }
+/* enforce readable text even in dark theme */
+.result-card, .result-card * { color:#0f172a !important; }
+.result-card hr { border-color: rgba(0,0,0,.12) !important; }
 
-.badge { ... color:#fff; }
-.badge-ok { background:#16a34a; }
-.badge-no { background:#dc2626; }
-.badge-unsure { background:#f59e0b; }
-...
-</style>
-<style>
-/* ฟอนต์และ layout */
-html, body, [class*="css"]  { font-size: 18px; }
-div.block-container { padding-top: 0.6rem; padding-bottom: 2.4rem; }
-
-/* กล่องคำแนะนำ */
-.hint-bar {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 14px;
-  padding: 0.8rem 1rem;
-  margin-bottom: 0.8rem;
-  color: #0f172a;
-}
-
-/* ปุ่มหลัก */
-.stButton > button {
-  width: 100%;
-  padding: 0.95rem 1.1rem;
-  font-size: 1.12rem;
-  font-weight: 700;
-  border-radius: 14px;
-  transition: all .15s ease;
-}
-.btn-primary { background: #2563eb !important; color:#fff !important; border: none !important; }
-.btn-primary:hover { background: #1e40af !important; }
-.btn-secondary { background: #e2e8f0 !important; color:#0f172a !important; border: none !important; }
-.btn-secondary:hover { background: #cbd5e1 !important; }
-
-/* การ์ดผลลัพธ์ */
-.result-card {
-  border-radius: 16px;
-  padding: 1rem 1.1rem;
-  margin-top: 0.6rem;
-  border: 1px solid rgba(0,0,0,0.08);
-  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-  background: #f9fafb; /* เทาอ่อนเพื่อให้ badge เด่น */
-}
-/* ป้ายผลลัพธ์ (badge) */
+/* Badge */
 .badge {
-  display:inline-block;
-  padding: 0.35rem 0.9rem;
-  border-radius: 999px;
-  font-weight: 700;
-  font-size: 1rem;
-  color: #fff;
-  border: 2px solid #fff; /* ขอบขาวตัดพื้นหลัง */
-  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  display:inline-block; padding:.35rem .9rem; border-radius:999px;
+  font-weight:800; font-size:1rem; color:#fff; border:2px solid #fff;
+  box-shadow:0 2px 4px rgba(0,0,0,.15);
 }
+.badge-ok { background:#22c55e; }
+.badge-no { background:#ef4444; }
+.badge-unsure { background:#f59e0b; }
 
-/* สีตัดพื้นหลังชัด */
-.badge-ok { background: #22c55e; }        /* เขียวสด ผ่าน */
-.badge-no { background: #ef4444; }        /* แดงสด ไม่ผ่าน */
-.badge-unsure { background: #f59e0b; }    /* เหลืองสด ไม่แน่ใจ */
+/* List */
+.result-list { margin:.4rem 0 0 1.1rem; }
+.result-list li { margin-bottom:.2rem; }
 
-/* กล้อง/label ให้ชัด */
-[data-testid="stCameraInputLabel"] { font-size: 1.05rem; }
-
-/* อินพุตใหญ่พอสำหรับนิ้ว */
-textarea, input, .stTextInput input { font-size: 1rem !important; }
-
-/* รายการเหตุผล */
-.result-list { margin: 0.4rem 0 0 1.1rem; }
-.result-list li { margin-bottom: 0.2rem; }
+/* Settings panel mimic (Lens-like sheet) */
+.panel {
+  border:1px solid #e2e8f0; border-radius:16px; background:#f8fafc;
+  padding:12px 14px; margin-bottom:.4rem;
+}
+.panel h4 { margin:.2rem 0 .6rem 0; font-size:1.05rem; }
+textarea, input, .stTextInput input, .stSelectbox div, .stSlider { font-size:1rem !important; }
 </style>
 """
-st.markdown(MOBILE_CSS, unsafe_allow_html=True)
+st.markdown(CSS, unsafe_allow_html=True)
 
-# ===================== ค่าเริ่มต้น + ข้อความ =====================
+# ===================== Defaults & schema hint =====================
 DEFAULT_RULES = """\
 กฎระเบียบทรงผม (ชาย)
 1) รองทรงสูง ด้านข้าง/ด้านหลังสั้น
@@ -113,11 +93,11 @@ SCHEMA_HINT = """\
   "reasons": ["string"],
   "violations": [{"code":"STRING","message":"STRING"}],
   "confidence": 0.0,
-  "meta": {"student_id":"STRING","rule_set_id":"default-v1","timestamp":"AUTO"}
+  "meta": {"rule_set_id":"default-v1","timestamp":"AUTO"}
 }
 """
 
-# ===================== Utilities =====================
+# ===================== Helpers =====================
 def esc(s: object) -> str:
     return html.escape(str(s), quote=True)
 
@@ -130,20 +110,20 @@ def verdict_badge(verdict: str) -> str:
     label, css = mp.get(verdict, ("ไม่แน่ใจ", "badge-unsure"))
     return f'<span class="badge {css}">{label}</span>'
 
-def compress_image(img: Image.Image, mime: str) -> bytes:
-    """ลดขนาดภาพให้เร็วขึ้นและประหยัดเน็ต โดยคงชนิดไฟล์สอดคล้องกับ MIME"""
+def compress_image(img: Image.Image, mime: str, max_side: int = 1024, jpeg_q: int = 85) -> bytes:
+    """Resize down + compress for mobile networks"""
     img = img.copy()
-    img.thumbnail((1024, 1024))
+    img.thumbnail((max_side, max_side))
     buf = io.BytesIO()
     if mime == "image/png":
         img.save(buf, format="PNG", optimize=True)
     else:
-        img.save(buf, format="JPEG", quality=85, optimize=True)
+        img.save(buf, format="JPEG", quality=jpeg_q, optimize=True)
     return buf.getvalue()
 
-# ===================== เรียก Gemini (พร้อม retry เบื้องต้น) =====================
-def call_gemini(image_bytes: bytes, mime: str, student_id: str, rules: str, retries: int = 2):
-    # คีย์: st.secrets -> ENV
+# ===================== Gemini call =====================
+def call_gemini(image_bytes: bytes, mime: str, rules: str, model_name: str, retries: int = 2):
+    # API key: secrets -> env
     api_key = None
     try:
         api_key = st.secrets.get("GEMINI_API_KEY")
@@ -168,7 +148,6 @@ USER (ไทย):
 เงื่อนไข:
 - ถ้ารูปไม่ชัด/ไม่เห็นทรงผมพอ ให้ verdict="unsure" และบอกเหตุผล
 - เหตุผลควรกระชับ เข้าใจง่าย
-- meta.student_id = {student_id or "UNKNOWN"}
 - meta.rule_set_id = "default-v1"
 """
 
@@ -176,7 +155,7 @@ USER (ไทย):
     for i in range(retries):
         try:
             resp = client.models.generate_content(
-                model="gemini-2.5-flash",
+                model=model_name,
                 contents=[{
                     "role": "user",
                     "parts": [
@@ -191,7 +170,7 @@ USER (ไทย):
         except errors.ServerError as e:
             last_err = e
             if "503" in str(e) and i < retries - 1:
-                st.toast("ระบบกำลังใช้งานหนาแน่น กำลังลองใหม่…", icon="⏳")
+                st.toast("ระบบหนาแน่น กำลังลองใหม่…", icon="⏳")
                 time.sleep(2 * (i + 1))
                 continue
             break
@@ -204,75 +183,95 @@ USER (ไทย):
         "reasons": [f"เกิดข้อผิดพลาดระหว่างเรียกโมเดล: {last_err}"],
         "violations": [],
         "confidence": 0.0,
-        "meta": {"student_id": student_id or "UNKNOWN", "rule_set_id": "default-v1"}
+        "meta": {"rule_set_id": "default-v1"}
     }
 
-# ===================== ส่วนหัว & คำแนะนำ =====================
-st.markdown("### ✂️ ตรวจทรงผมนักเรียน (ใช้งานง่ายสำหรับทุกคน)")
-st.markdown(
-    """
-    <div class="hint-bar">
-      ✅ <b>ขั้นตอนง่าย ๆ</b> — ใส่รหัส (ถ้ามี) → ถ่ายภาพให้เห็นทรงผมชัด → กด <b>ยืนยันและตรวจ</b><br>
-      💡 <b>เคล็ดลับ</b> — จัดแสงให้เพียงพอ, ไม่ให้ผมบังหู, หันด้านข้างเล็กน้อย<br>
-      🔒 <b>ความเป็นส่วนตัว</b> — ภาพใช้เฉพาะการตรวจและไม่เผยแพร่ต่อ
-    </div>
-    """,
-    unsafe_allow_html=True
-)
-
-# ===================== โหมดผู้เชี่ยวชาญ (ซ่อนเป็นค่าเริ่มต้น) =====================
-with st.expander("ตัวเลือกผู้เชี่ยวชาญ (แก้ไขกฎระเบียบ/ตั้งค่าเพิ่มเติม)"):
-    rules = st.text_area("กฎระเบียบ (ปรับได้)", DEFAULT_RULES, height=120)
-
-# ถ้าไม่ได้เปิด expander ให้ใช้กฎเริ่มต้น
+# ===================== State init =====================
+if "show_settings" not in st.session_state:
+    st.session_state.show_settings = False
 if "rules_cache" not in st.session_state:
     st.session_state.rules_cache = DEFAULT_RULES
-if not rules:
-    rules = st.session_state.rules_cache
-else:
-    st.session_state.rules_cache = rules
+if "auto_analyze" not in st.session_state:
+    st.session_state.auto_analyze = True
+if "model_name" not in st.session_state:
+    st.session_state.model_name = "gemini-2.5-flash"
+if "max_side" not in st.session_state:
+    st.session_state.max_side = 1024
+if "jpeg_q" not in st.session_state:
+    st.session_state.jpeg_q = 85
+if "last_result" not in st.session_state:
+    st.session_state.last_result = None
 
-# ===================== ฟอร์มเดียว: รหัส + กล้อง + ปุ่มยืนยัน =====================
-with st.form("capture_form", clear_on_submit=False):
-    student_id = st.text_input("รหัสนักเรียน (ไม่บังคับ)", placeholder="เช่น 68301430004")
+# ===================== Top bar (brand + gear) =====================
+c1, c2 = st.columns([6, 1])
+with c1:
+    st.markdown('<div class="topbar"><div class="brand">Hair Check</div></div>', unsafe_allow_html=True)
+with c2:
+    if st.button("⚙️", key="gear", help="ตั้งค่า", type="secondary", use_container_width=True):
+        st.session_state.show_settings = not st.session_state.show_settings
+# mimic Lens: gear toggles a compact panel below
 
-    photo = st.camera_input("ถ่ายภาพด้วยกล้อง")
+# ===================== Settings Panel =====================
+if st.session_state.show_settings:
+    with st.container():
+        st.markdown('<div class="panel">', unsafe_allow_html=True)
+        st.markdown("#### การตั้งค่า")
+        st.session_state.model_name = st.selectbox(
+            "โมเดล", ["gemini-2.5-flash", "gemini-2.5-pro"], index=0
+        )
+        st.session_state.auto_analyze = st.toggle("วิเคราะห์อัตโนมัติหลังถ่าย", value=st.session_state.auto_analyze)
+        st.session_state.max_side = st.slider("จำกัดด้านยาวภาพ (px)", 640, 2048, st.session_state.max_side, step=64)
+        st.session_state.jpeg_q = st.slider("คุณภาพ JPEG (%)", 50, 95, st.session_state.jpeg_q, step=5)
+        rules = st.text_area("กฎระเบียบ (ปรับได้)", st.session_state.rules_cache, height=120)
+        st.session_state.rules_cache = rules or DEFAULT_RULES
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    # ปุ่มสองปุ่ม: ยืนยัน, ล้างข้อมูล
-    c1, c2 = st.columns(2)
-    with c1:
-        submitted = st.form_submit_button("✅ ยืนยันและตรวจ", use_container_width=True)
-    with c2:
-        reset = st.form_submit_button("🗑️ ถ่ายใหม่/ล้าง", use_container_width=True)
+# ===================== Main capture area =====================
+st.caption("ถ่ายภาพให้เห็นทรงผมชัดเจน แล้วกดตรวจ")
+photo = st.camera_input("ถ่ายภาพ", key="cam")
 
-if reset:
-    st.session_state.pop("last_result", None)
+# Auto analyze once after capture
+trigger_auto = st.session_state.auto_analyze and photo is not None and st.session_state.last_result is None
+
+# Action buttons
+colA, colB = st.columns(2)
+with colA:
+    analyze_clicked = st.button("🔎 ตรวจทันที", type="primary", use_container_width=True)
+with colB:
+    clear_clicked = st.button("↺ ถ่ายใหม่", type="secondary", use_container_width=True)
+
+if clear_clicked:
+    st.session_state.last_result = None
     st.rerun()
 
-# ===================== ประมวลผลเมื่อยืนยัน =====================
-if submitted:
-    if not photo:
-        st.warning("กรุณาถ่ายภาพก่อนกด “ยืนยันและตรวจ”")
-    else:
-        # แสดงภาพให้ผู้ใช้เห็นก่อน
+# ===================== Run analysis =====================
+if photo and (analyze_clicked or trigger_auto):
+    try:
         img = Image.open(photo).convert("RGB")
         mime = photo.type if photo.type in ("image/png", "image/jpeg") else "image/jpeg"
         st.image(img, caption="ภาพที่ถ่าย", use_container_width=True)
 
-        # แถบความคืบหน้าแบบเรียบง่าย
-        prog = st.progress(0, text="กำลังเตรียมภาพ…")
-        image_bytes = compress_image(img, mime); prog.progress(40, text="กำลังส่งไปตรวจ…")
+        prog = st.progress(0, text="เตรียมภาพ…")
+        image_bytes = compress_image(img, mime, max_side=st.session_state.max_side, jpeg_q=st.session_state.jpeg_q)
+        prog.progress(35, text="กำลังส่งไปตรวจ…")
 
         with st.spinner("ระบบกำลังตรวจ…"):
-            result = call_gemini(image_bytes, mime=mime, student_id=student_id, rules=rules)
+            result = call_gemini(
+                image_bytes=image_bytes,
+                mime=mime,
+                rules=st.session_state.rules_cache,
+                model_name=st.session_state.model_name,
+            )
         prog.progress(100, text="เสร็จสิ้น")
-        st.toast("ตรวจเสร็จเรียบร้อย", icon="✅")
+        st.toast("ตรวจเสร็จแล้ว", icon="✅")
 
         st.session_state.last_result = result
+    except Exception as e:
+        st.error(f"ไม่สามารถวิเคราะห์ได้: {e}")
 
-# ===================== การ์ดผลลัพธ์ (อ่านง่าย) =====================
-if st.session_state.get("last_result"):
-    r = st.session_state["last_result"]
+# ===================== Result card =====================
+if st.session_state.last_result:
+    r = st.session_state.last_result
     verdict = r.get("verdict", "unsure")
     reasons = r.get("reasons", []) or []
     violations = r.get("violations", []) or []
@@ -293,15 +292,7 @@ if st.session_state.get("last_result"):
             {''.join(f'<li>{esc(x)}</li>' for x in reasons)}
           </ul>
           {"<div style='font-weight:700;margin-top:10px;'>ข้อที่ไม่ตรงระเบียบ</div><ul class='result-list'>" + ''.join(f"<li>{esc(v.get('message',''))}</li>" for v in violations) + "</ul>" if violations else ""}
-          <div style="margin-top:8px;color:#64748b;">รหัสนักเรียน: <b>{esc(meta.get('student_id','-'))}</b> • ชุดกฎ: <b>{esc(meta.get('rule_set_id','default-v1'))}</b></div>
         </div>
         """,
         unsafe_allow_html=True
     )
-
-    st.divider()
-    st.caption("ถ้าผลไม่ชัดเจน: ลองถ่ายใหม่ให้เห็นด้านข้างศีรษะและใบหูชัดเจนขึ้น")
-
-
-
-
