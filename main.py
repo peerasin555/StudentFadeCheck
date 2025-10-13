@@ -1,4 +1,4 @@
-# app.py  — Google Lens-inspired UI
+# app.py  — Improved UI with better UX
 import os, io, json, html, time
 from typing import Any, Dict
 from PIL import Image
@@ -11,367 +11,278 @@ st.set_page_config(page_title="Hair Check", page_icon="✂️", layout="wide")
 
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&family=Sarabun:wght@400;500;600;700&display=swap');
-
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
+/* Base styles */
 html, body, [class*="css"] { 
     font-size: 16px; 
-    font-family: 'Sarabun', 'Google Sans', -apple-system, BlinkMacSystemFont, sans-serif !important;
-    background: #fff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
-
 div.block-container { 
-    padding: 0 !important;
-    max-width: 100% !important;
+    padding: 1rem 1rem 3rem;
+    max-width: 600px;
+    margin: 0 auto;
 }
 
-/* Google Lens-style header */
-.lens-header {
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    background: #fff;
-    border-bottom: 1px solid #e8eaed;
-    padding: 12px 16px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+/* Header with gradient */
+.header { 
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 1.5rem;
+    border-radius: 20px;
+    margin-bottom: 1.5rem;
+    text-align: center;
+    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
 }
-
-.lens-logo {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 20px;
-    font-weight: 500;
-    color: #202124;
-}
-
-.lens-logo-icon {
-    width: 24px;
-    height: 24px;
-    background: linear-gradient(135deg, #4285f4, #34a853, #fbbc05, #ea4335);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.header h1 { 
+    font-size: 28px;
+    margin: 0;
     color: white;
+    font-weight: 800;
+    letter-spacing: 0.5px;
+}
+.header p {
+    color: rgba(255, 255, 255, 0.9);
+    margin: 8px 0 0 0;
     font-size: 14px;
 }
 
-/* Camera viewfinder - full screen style */
-.camera-container {
+/* Camera container with better spacing */
+.cam-box { 
     position: relative;
-    width: 100%;
-    height: 70vh;
-    max-height: 600px;
-    background: #000;
-    overflow: hidden;
-}
-
-.camera-container [data-testid="stCameraInputLabel"] { 
-    display: none; 
-}
-
-.camera-container [data-testid="stCameraInput"] {
-    height: 100%;
-}
-
-.camera-container [data-testid="stCameraInput"] video,
-.camera-container [data-testid="stCameraInput"] img { 
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 0;
-}
-
-/* Lens-style scanning overlay */
-.scan-overlay {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.scan-frame {
-    width: 280px;
-    height: 280px;
-    position: relative;
-}
-
-.scan-corner {
-    position: absolute;
-    width: 48px;
-    height: 48px;
-    border: 3px solid #fff;
-    box-shadow: 0 0 20px rgba(0,0,0,0.3);
-}
-
-.scan-corner.tl { top: 0; left: 0; border-bottom: none; border-right: none; border-radius: 8px 0 0 0; }
-.scan-corner.tr { top: 0; right: 0; border-bottom: none; border-left: none; border-radius: 0 8px 0 0; }
-.scan-corner.bl { bottom: 0; left: 0; border-top: none; border-right: none; border-radius: 0 0 0 8px; }
-.scan-corner.br { bottom: 0; right: 0; border-top: none; border-left: none; border-radius: 0 0 8px 0; }
-
-.scan-line {
-    position: absolute;
-    width: 100%;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, #4285f4, transparent);
-    animation: scanline 2s ease-in-out infinite;
-}
-
-@keyframes scanline {
-    0%, 100% { top: 0; opacity: 0; }
-    50% { top: 50%; opacity: 1; }
-}
-
-/* Camera hint */
-.camera-hint {
-    position: absolute;
-    bottom: 24px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(32, 33, 36, 0.9);
-    backdrop-filter: blur(10px);
-    color: white;
-    padding: 12px 24px;
+    margin-bottom: 1rem;
+    background: #f8fafc;
+    padding: 1rem;
     border-radius: 24px;
-    font-size: 14px;
-    font-weight: 500;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+}
+.cam-box [data-testid="stCameraInputLabel"] { 
+    display: none;
+}
+.cam-box [data-testid="stCameraInput"] video,
+.cam-box [data-testid="stCameraInput"] img { 
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
 }
 
-/* Bottom action bar */
-.action-bar {
-    background: #fff;
-    padding: 16px;
+/* Modern corner overlays */
+.overlay { 
+    pointer-events: none;
+    position: absolute;
+    inset: 24px;
+    border-radius: 16px;
+}
+.corner { 
+    position: absolute;
+    width: 50px;
+    height: 50px;
+    border: 4px solid #667eea;
+    opacity: 0.8;
+    border-radius: 12px;
+    transition: all 0.3s ease;
+}
+.corner.tl { left: 0; top: 0; border-bottom: none; border-right: none; }
+.corner.tr { right: 0; top: 0; border-bottom: none; border-left: none; }
+.corner.bl { left: 0; bottom: 0; border-top: none; border-right: none; }
+.corner.br { right: 0; bottom: 0; border-top: none; border-left: none; }
+
+/* Info card */
+.info-card {
+    background: linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%);
+    padding: 1rem 1.25rem;
+    border-radius: 16px;
+    margin: 1rem 0;
+    border: 2px solid #c7d2fe;
+}
+.info-card-title {
+    font-weight: 700;
+    color: #4c1d95;
+    margin-bottom: 0.5rem;
+    font-size: 15px;
+}
+.info-card-text {
+    color: #5b21b6;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+/* Hint pill - improved */
+.hint { 
+    text-align: center;
+    margin: 1rem 0;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    padding: 12px 20px;
+    border-radius: 16px;
+    display: inline-block;
+    font-weight: 600;
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+/* Button container */
+.button-container {
     display: flex;
     gap: 12px;
-    border-top: 1px solid #e8eaed;
+    margin: 1.5rem 0;
 }
 
-/* Google Material buttons */
-.stButton > button {
+/* Buttons - modern design */
+.stButton > button { 
     width: 100%;
-    height: 48px;
-    border-radius: 24px;
-    font-size: 15px;
-    font-weight: 500;
-    border: none;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    font-family: 'Sarabun', 'Google Sans', sans-serif !important;
-    box-shadow: none;
-}
-
-.stButton > button[kind="primary"] {
-    background: #1a73e8 !important;
-    color: white !important;
-}
-
-.stButton > button[kind="primary"]:hover {
-    background: #1765cc !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24) !important;
-}
-
-.stButton > button[kind="secondary"] {
-    background: #f1f3f4 !important;
-    color: #3c4043 !important;
-}
-
-.stButton > button[kind="secondary"]:hover {
-    background: #e8eaed !important;
-}
-
-/* Results bottom sheet - Google style */
-.results-sheet {
-    background: #fff;
-    border-radius: 28px 28px 0 0;
-    box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-    margin-top: -28px;
-    position: relative;
-    z-index: 10;
-}
-
-.sheet-handle {
-    width: 32px;
-    height: 4px;
-    background: #dadce0;
-    border-radius: 2px;
-    margin: 12px auto;
-}
-
-.sheet-content {
-    padding: 0 16px 24px;
-}
-
-/* Result card - Material Design */
-.result-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 16px;
+    padding: 1rem 1.2rem;
+    font-size: 16px;
+    font-weight: 700;
     border-radius: 16px;
-    font-size: 14px;
-    font-weight: 500;
-    margin-bottom: 16px;
+    border: none !important;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.stButton > button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+}
+.stButton > button[kind="primary"] { 
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: #fff !important;
+}
+.stButton > button[kind="secondary"] { 
+    background: #f1f5f9 !important;
+    color: #334155 !important;
 }
 
-.result-chip.success {
-    background: #e6f4ea;
-    color: #137333;
+/* Result sheet - improved */
+.sheet { 
+    border-radius: 24px 24px 0 0;
+    padding: 1.5rem;
+    background: white;
+    box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
+    border: 1px solid rgba(0,0,0,0.06);
+    margin-top: 2rem;
 }
 
-.result-chip.error {
-    background: #fce8e6;
-    color: #c5221f;
-}
-
-.result-chip.warning {
-    background: #fef7e0;
-    color: #ea8600;
-}
-
-.result-section {
-    margin-bottom: 24px;
+.result-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #f1f5f9;
 }
 
 .result-title {
-    font-size: 14px;
-    font-weight: 500;
-    color: #5f6368;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 12px;
+    font-weight: 800;
+    font-size: 20px;
+    color: #0f172a;
 }
 
-.result-card {
-    background: #f8f9fa;
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 12px;
-}
-
-.result-item {
-    display: flex;
-    align-items: flex-start;
-    gap: 12px;
-    padding: 8px 0;
-    color: #3c4043;
-    line-height: 1.5;
-}
-
-.result-icon {
-    width: 20px;
-    height: 20px;
-    flex-shrink: 0;
-    margin-top: 2px;
-}
-
-/* Confidence meter - Material style */
-.confidence-container {
-    background: #f8f9fa;
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 16px;
-}
-
-.confidence-label {
-    display: flex;
-    justify-content: space-between;
+/* Badge - improved */
+.badge { 
+    display: inline-flex;
     align-items: center;
-    margin-bottom: 8px;
+    padding: 8px 16px;
+    border-radius: 12px;
+    color: white;
+    font-weight: 800;
     font-size: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.badge::before {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: white;
+    margin-right: 8px;
+}
+.badge-ok { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+.badge-no { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
+.badge-unsure { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+
+/* Result sections */
+.result-section {
+    background: #f8fafc;
+    padding: 1rem 1.25rem;
+    border-radius: 16px;
+    margin: 1rem 0;
+    border: 1px solid #e2e8f0;
 }
 
-.confidence-label-text {
-    color: #5f6368;
-    font-weight: 500;
-}
-
-.confidence-value {
-    color: #1a73e8;
+.result-section-title {
     font-weight: 700;
-}
-
-.confidence-bar-bg {
-    height: 4px;
-    background: #e8eaed;
-    border-radius: 2px;
-    overflow: hidden;
-}
-
-.confidence-bar-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #1a73e8, #4285f4);
-    border-radius: 2px;
-    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Info card - Material */
-.info-card {
-    border: 1px solid #e8eaed;
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 12px;
-    background: #fff;
-}
-
-.info-card-title {
-    font-size: 16px;
-    font-weight: 500;
-    color: #202124;
-    margin-bottom: 12px;
+    color: #1e293b;
+    margin-bottom: 0.75rem;
+    font-size: 15px;
     display: flex;
     align-items: center;
-    gap: 8px;
 }
 
-.info-list {
-    list-style: none;
-    padding: 0;
+.result-section-title::before {
+    content: '•';
+    color: #667eea;
+    font-size: 24px;
+    margin-right: 8px;
 }
 
-.info-list li {
-    padding: 6px 0;
-    padding-left: 24px;
-    position: relative;
-    color: #5f6368;
-    line-height: 1.5;
+.result-list {
+    margin: 0;
+    padding-left: 1.5rem;
 }
 
-.info-list li:before {
-    content: "•";
-    position: absolute;
-    left: 8px;
-    color: #1a73e8;
-    font-weight: bold;
+.result-list li {
+    margin-bottom: 0.5rem;
+    color: #334155;
+    line-height: 1.6;
+    font-size: 14px;
 }
 
-/* Hide Streamlit elements */
-.stCameraInput button {
-    background: transparent !important;
-    border: none !important;
+/* Confidence bar */
+.confidence-bar {
+    background: #e2e8f0;
+    height: 8px;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 0.5rem;
 }
 
+.confidence-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 999px;
+    transition: width 0.5s ease;
+}
+
+/* Alert messages */
 .stAlert {
-    border-radius: 12px !important;
-    border: none !important;
-    font-size: 14px !important;
+    border-radius: 16px;
+    padding: 1rem 1.25rem;
 }
 
-/* Progress bar override */
+/* Progress bar */
 .stProgress > div > div {
-    background: #1a73e8 !important;
+    border-radius: 999px;
+}
+
+/* Image preview */
+.image-preview {
+    border-radius: 20px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    margin: 1.5rem 0;
+}
+
+/* Loading animation */
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+.loading {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+    .header h1 { font-size: 24px; }
+    .result-title { font-size: 18px; }
+    .button-container { flex-direction: column; }
 }
 </style>
 """
@@ -395,17 +306,18 @@ SCHEMA_HINT = (
 def esc(x: Any) -> str:
     return html.escape(str(x), quote=True)
 
-def result_chip(verdict: str) -> str:
+def badge(verdict: str) -> str:
     m = {
-        "compliant": ("✓ ผ่านระเบียบ", "success"),
-        "non_compliant": ("✗ ไม่ผ่าน", "error"),
-        "unsure": ("? ไม่แน่ใจ", "warning"),
+        "compliant": ("✓ ผ่านระเบียบ", "badge-ok"),
+        "non_compliant": ("✗ ไม่ผ่านระเบียบ", "badge-no"),
+        "unsure": ("? ไม่แน่ใจ", "badge-unsure"),
     }
-    label, cls = m.get(verdict, ("? ไม่แน่ใจ", "warning"))
-    return f'<div class="result-chip {cls}">{label}</div>'
+    label, cls = m.get(verdict, ("? ไม่แน่ใจ", "badge-unsure"))
+    return f'<span class="badge {cls}">{label}</span>'
 
 def compress(img: Image.Image, mime: str) -> bytes:
-    img = img.copy(); img.thumbnail((1024,1024))
+    img = img.copy()
+    img.thumbnail((1024, 1024))
     buf = io.BytesIO()
     if mime == "image/png":
         img.save(buf, "PNG", optimize=True)
@@ -451,7 +363,7 @@ USER (ไทย):
         except errors.ServerError as e:
             last_err = e
             if "503" in str(e) and i < retries - 1:
-                st.info("กำลังลองใหม่...")
+                st.info("🔄 ระบบหนาแน่น กำลังลองใหม่...")
                 time.sleep(2 * (i + 1))
                 continue
             break
@@ -467,72 +379,89 @@ USER (ไทย):
         "meta": {"rule_set_id": "default-v1"},
     }
 
-# ----------------- Header (Google Lens style) -----------------
-st.markdown("""
-<div class="lens-header">
-    <div class="lens-logo">
-        <div class="lens-logo-icon">✂</div>
-        <span>Hair Check</span>
+# ----------------- Header -----------------
+st.markdown('''
+<div class="header">
+    <h1>✂️ Hair Check</h1>
+    <p>ระบบตรวจสอบทรงผมนักเรียนอัตโนมัติ</p>
+</div>
+''', unsafe_allow_html=True)
+
+# Info card
+st.markdown('''
+<div class="info-card">
+    <div class="info-card-title">📋 วิธีใช้งาน</div>
+    <div class="info-card-text">
+        1. กดปุ่ม "Take Photo" เพื่อถ่ายภาพ<br>
+        2. ตรวจสอบภาพที่ถ่ายให้ชัดเจน<br>
+        3. กดปุ่ม "🔎 ตรวจสอบ" เพื่อวิเคราะห์ทรงผม
     </div>
 </div>
-""", unsafe_allow_html=True)
+''', unsafe_allow_html=True)
 
-# ----------------- Camera (Full-screen viewfinder) -----------------
-st.markdown('<div class="camera-container">', unsafe_allow_html=True)
-photo = st.camera_input(" ")
-
+# ----------------- Camera -----------------
+st.markdown('<div class="cam-box">', unsafe_allow_html=True)
+photo = st.camera_input("📸 ถ่ายภาพทรงผม")
 st.markdown("""
-<div class="scan-overlay">
-    <div class="scan-frame">
-        <div class="scan-corner tl"></div>
-        <div class="scan-corner tr"></div>
-        <div class="scan-corner bl"></div>
-        <div class="scan-corner br"></div>
-        <div class="scan-line"></div>
-    </div>
-</div>
-<div class="camera-hint">
-    📷 จัดมุมกล้องให้เห็นทรงผมชัดเจน
+<div class="overlay">
+    <div class="corner tl"></div>
+    <div class="corner tr"></div>
+    <div class="corner bl"></div>
+    <div class="corner br"></div>
 </div>
 """, unsafe_allow_html=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
-# ----------------- Action Buttons -----------------
-st.markdown('<div class="action-bar">', unsafe_allow_html=True)
-col1, col2 = st.columns([2, 1])
+# Hint
+st.markdown('<div style="text-align:center;"><span class="hint">💡 วางตำแหน่งใบหน้าให้อยู่ในกรอบสี่เหลี่ยม</span></div>', unsafe_allow_html=True)
+
+# Buttons
+st.markdown('<div class="button-container">', unsafe_allow_html=True)
+col1, col2 = st.columns(2)
 with col1:
-    do_analyze = st.button("🔍 ตรวจสอบ", type="primary", use_container_width=True)
+    do_analyze = st.button("🔎 ตรวจสอบ", type="primary", use_container_width=True)
 with col2:
-    clear = st.button("↻ ใหม่", type="secondary", use_container_width=True)
+    clear = st.button("↺ ถ่ายใหม่", type="secondary", use_container_width=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
 if clear:
-    st.session_state.pop("result", None)
+    if "result" in st.session_state:
+        del st.session_state["result"]
     st.rerun()
 
 # ----------------- Analyze -----------------
 if do_analyze:
     if not photo:
-        st.warning("กรุณาถ่ายภาพก่อน")
+        st.warning("⚠️ กรุณาถ่ายภาพก่อนกดตรวจสอบ")
     else:
         try:
             img = Image.open(photo).convert("RGB")
             mime = photo.type if photo.type in ("image/png", "image/jpeg") else "image/jpeg"
             
-            prog = st.progress(0, text="กำลังประมวลผล...")
-            data = compress(img, mime)
-            prog.progress(35, text="กำลังวิเคราะห์...")
+            # Show preview
+            st.markdown('<div class="image-preview">', unsafe_allow_html=True)
+            st.image(img, caption="📷 ภาพที่ถ่าย", use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
-            with st.spinner(""):
+            # Progress
+            prog = st.progress(0, text="⏳ กำลังเตรียมภาพ...")
+            data = compress(img, mime)
+            prog.progress(35, text="📤 กำลังส่งไปตรวจ...")
+
+            with st.spinner("🤖 ระบบ AI กำลังวิเคราะห์..."):
                 result = call_gemini(data, mime)
             
-            prog.progress(100, text="เสร็จสิ้น")
-            st.success("วิเคราะห์เสร็จแล้ว")
+            prog.progress(100, text="✅ เสร็จสิ้น")
+            time.sleep(0.5)
+            prog.empty()
+            
+            st.success("✅ ตรวจสอบเสร็จสิ้น!")
             st.session_state["result"] = result
+            
         except Exception as e:
-            st.error(f"เกิดข้อผิดพลาด: {e}")
+            st.error(f"❌ เกิดข้อผิดพลาด: {e}")
 
-# ----------------- Results (Bottom Sheet) -----------------
+# ----------------- Result -----------------
 res = st.session_state.get("result")
 if res:
     verdict = res.get("verdict", "unsure")
@@ -540,79 +469,47 @@ if res:
     violations = res.get("violations", []) or []
     conf = res.get("confidence", 0.0)
 
-    st.markdown('<div class="results-sheet">', unsafe_allow_html=True)
-    st.markdown('<div class="sheet-handle"></div>', unsafe_allow_html=True)
-    st.markdown('<div class="sheet-content">', unsafe_allow_html=True)
+    st.markdown('<div class="sheet">', unsafe_allow_html=True)
     
-    # Result chip
-    st.markdown(result_chip(verdict), unsafe_allow_html=True)
+    # Header
+    st.markdown(f"""
+    <div class="result-header">
+        <div class="result-title">📊 ผลการตรวจสอบ</div>
+        {badge(verdict)}
+    </div>
+    """, unsafe_allow_html=True)
     
     # Confidence
     st.markdown(f"""
-    <div class="confidence-container">
-        <div class="confidence-label">
-            <span class="confidence-label-text">ความเชื่อมั่น</span>
-            <span class="confidence-value">{conf:.0%}</span>
-        </div>
-        <div class="confidence-bar-bg">
-            <div class="confidence-bar-fill" style="width:{conf*100}%;"></div>
+    <div class="result-section">
+        <div class="result-section-title">🎯 ความมั่นใจของระบบ</div>
+        <div style="font-size: 24px; font-weight: 800; color: #667eea;">{conf:.1%}</div>
+        <div class="confidence-bar">
+            <div class="confidence-fill" style="width: {conf*100}%;"></div>
         </div>
     </div>
     """, unsafe_allow_html=True)
     
     # Reasons
     if reasons:
-        st.markdown('<div class="result-section">', unsafe_allow_html=True)
-        st.markdown('<div class="result-title">รายละเอียด</div>', unsafe_allow_html=True)
-        st.markdown('<div class="result-card">', unsafe_allow_html=True)
-        for reason in reasons:
-            st.markdown(f"""
-            <div class="result-item">
-                <div class="result-icon">💬</div>
-                <div>{esc(reason)}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        st.markdown('</div></div>', unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class="result-section">
+            <div class="result-section-title">💭 เหตุผลสรุป</div>
+            <ul class="result-list">
+                {''.join(f'<li>{esc(x)}</li>' for x in reasons)}
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
     
     # Violations
     if violations:
-        st.markdown('<div class="result-section">', unsafe_allow_html=True)
-        st.markdown('<div class="result-title">ข้อที่ไม่ผ่าน</div>', unsafe_allow_html=True)
-        st.markdown('<div class="result-card">', unsafe_allow_html=True)
-        for v in violations:
-            st.markdown(f"""
-            <div class="result-item">
-                <div class="result-icon">⚠️</div>
-                <div>{esc(v.get('message', ''))}</div>
-            </div>
-            """, unsafe_allow_html=True)
-        st.markdown('</div></div>', unsafe_allow_html=True)
-    
-    # Info card
-    st.markdown("""
-    <div class="info-card">
-        <div class="info-card-title">💡 คำแนะนำ</div>
-        <ul class="info-list">
-            <li>ผลนี้เป็นข้อมูลเบื้องต้นจาก AI</li>
-            <li>ควรให้ครูตรวจสอบอีกครั้ง</li>
-            <li>ถ่ายในที่แสงสว่างเพื่อความแม่นยำ</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown('</div></div>', unsafe_allow_html=True)
-
-# Info section (before taking photo)
-if not res:
-    st.markdown("""
-    <div style="padding: 16px;">
-        <div class="info-card">
-            <div class="info-card-title">📋 กฎระเบียบทรงผม</div>
-            <ul class="info-list">
-                <li>รองทรงสูง ด้านข้างและหลังสั้น</li>
-                <li>ด้านบนยาวไม่เกิน 5 ซม.</li>
-                <li>ห้ามย้อมสี ดัด หรือไว้หนวดเครา</li>
+        st.markdown(f"""
+        <div class="result-section">
+            <div class="result-section-title">⚠️ จุดที่ไม่ตรงกับระเบียบ</div>
+            <ul class="result-list">
+                {''.join(f'<li><b>{esc(v.get("code", "N/A"))}</b>: {esc(v.get("message", ""))}</li>' for v in violations)}
             </ul>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
+    
+    st.markdown('</div>', unsafe_allow_html=True)
