@@ -1,4 +1,4 @@
-# app.py  — Improved UI with better UX
+# app.py — Stable, mobile-first, production-hardened
 import os, io, json, html, time
 from typing import Any, Dict
 from PIL import Image
@@ -11,279 +11,95 @@ st.set_page_config(page_title="Hair Check", page_icon="✂️", layout="wide")
 
 CSS = """
 <style>
-/* Base styles */
-html, body, [class*="css"] { 
-    font-size: 16px; 
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+/* Base */
+html, body, [class*="css"] {
+  font-size: 16px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
-div.block-container { 
-    padding: 1rem 1rem 3rem;
-    max-width: 600px;
-    margin: 0 auto;
-}
-
-/* Header with gradient */
-.header { 
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    padding: 1.5rem;
-    border-radius: 20px;
-    margin-bottom: 1.5rem;
-    text-align: center;
-    box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
-}
-.header h1 { 
-    font-size: 28px;
-    margin: 0;
-    color: white;
-    font-weight: 800;
-    letter-spacing: 0.5px;
-}
-.header p {
-    color: rgba(255, 255, 255, 0.9);
-    margin: 8px 0 0 0;
-    font-size: 14px;
+div.block-container {
+  padding: 1rem 1rem 3rem;
+  max-width: 640px;
+  margin: 0 auto;
 }
 
-/* Camera container with better spacing */
-.cam-box { 
-    position: relative;
-    margin-bottom: 1rem;
-    background: #f8fafc;
-    padding: 1rem;
-    border-radius: 24px;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.08);
+/* Header */
+.header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 1.25rem 1.5rem;
+  border-radius: 20px;
+  margin-bottom: 1.25rem;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
 }
-.cam-box [data-testid="stCameraInputLabel"] { 
-    display: none;
-}
+.header h1 { font-size: 26px; margin: 0; color: #fff; font-weight: 800; }
+.header p  { color: rgba(255,255,255,.95); margin:.4rem 0 0; font-size: 14px; }
+
+/* Camera */
+.cam-box { position: relative; margin-bottom: .75rem; background:#f8fafc;
+  padding: 1rem; border-radius: 24px; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+.cam-box [data-testid="stCameraInputLabel"] { display: none; }
 .cam-box [data-testid="stCameraInput"] video,
-.cam-box [data-testid="stCameraInput"] img { 
-    border-radius: 16px;
-    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-}
+.cam-box [data-testid="stCameraInput"] img { border-radius: 16px; box-shadow: 0 4px 16px rgba(0,0,0,.1); }
 
-/* Modern corner overlays */
-.overlay { 
-    pointer-events: none;
-    position: absolute;
-    inset: 24px;
-    border-radius: 16px;
-}
-.corner { 
-    position: absolute;
-    width: 50px;
-    height: 50px;
-    border: 4px solid #667eea;
-    opacity: 0.8;
-    border-radius: 12px;
-    transition: all 0.3s ease;
-}
-.corner.tl { left: 0; top: 0; border-bottom: none; border-right: none; }
-.corner.tr { right: 0; top: 0; border-bottom: none; border-left: none; }
-.corner.bl { left: 0; bottom: 0; border-top: none; border-right: none; }
-.corner.br { right: 0; bottom: 0; border-top: none; border-left: none; }
+/* Overlay corners */
+.overlay { pointer-events:none; position:absolute; inset:24px; border-radius:16px; }
+.corner { position:absolute; width:50px; height:50px; border:4px solid #667eea; opacity:.85; border-radius:12px; }
+.corner.tl{left:0;top:0;border-bottom:none;border-right:none}
+.corner.tr{right:0;top:0;border-bottom:none;border-left:none}
+.corner.bl{left:0;bottom:0;border-top:none;border-right:none}
+.corner.br{right:0;bottom:0;border-top:none;border-left:none}
 
 /* Info card */
-.info-card {
-    background: linear-gradient(135deg, #e0e7ff 0%, #f3e8ff 100%);
-    padding: 1rem 1.25rem;
-    border-radius: 16px;
-    margin: 1rem 0;
-    border: 2px solid #c7d2fe;
+.info-card{background:linear-gradient(135deg,#e0e7ff 0%,#f3e8ff 100%);
+  padding:1rem 1.25rem;border-radius:16px;margin:1rem 0;border:2px solid #c7d2fe;}
+.info-card-title{font-weight:700;color:#4c1d95;margin-bottom:.5rem;font-size:15px;}
+.info-card-text{color:#5b21b6;font-size:14px;line-height:1.6;}
+
+/* Hint pill */
+.hint{ text-align:center; margin: .8rem 0; background: linear-gradient(135deg,#667eea 0%,#764ba2 100%);
+  color:#fff; padding: 10px 16px; border-radius: 16px; display:inline-block; font-weight:700; font-size:14px;
+  box-shadow: 0 4px 12px rgba(102,126,234,.3); }
+
+/* Buttons – stable selectors */
+.button-container { display:flex; gap:12px; margin: 1.2rem 0; }
+.stButton > button {
+  width: 100%; padding: 1rem 1.2rem; font-size: 16px; font-weight: 700;
+  border-radius: 16px; border: none !important; transition: all .2s ease;
+  box-shadow: 0 2px 8px rgba(0,0,0,.1); background:#f1f5f9 !important; color:#334155 !important;
 }
-.info-card-title {
-    font-weight: 700;
-    color: #4c1d95;
-    margin-bottom: 0.5rem;
-    font-size: 15px;
-}
-.info-card-text {
-    color: #5b21b6;
-    font-size: 14px;
-    line-height: 1.6;
+.stButton > button:hover { transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,.15); }
+/* First button in row -> primary look */
+div.row-buttons > div:first-child .stButton > button {
+  background: linear-gradient(135deg,#667eea 0%,#764ba2 100%) !important; color:#fff !important;
 }
 
-/* Hint pill - improved */
-.hint { 
-    text-align: center;
-    margin: 1rem 0;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: #fff;
-    padding: 12px 20px;
-    border-radius: 16px;
-    display: inline-block;
-    font-weight: 600;
-    font-size: 14px;
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
-}
+/* Sheet / Results */
+.sheet { border-radius: 24px 24px 0 0; padding: 1.25rem 1.25rem 1.5rem; background:#fff;
+  box-shadow:0 -4px 24px rgba(0,0,0,.12); border:1px solid rgba(0,0,0,.06); margin-top:1.6rem; }
+.sheet, .sheet * { color:#0f172a !important; } /* readable on dark theme */
 
-/* Button container */
-.button-container {
-    display: flex;
-    gap: 12px;
-    margin: 1.5rem 0;
-}
+.result-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;
+  padding-bottom: .8rem; border-bottom:2px solid #f1f5f9;}
+.result-title{font-weight:800;font-size:20px;}
+.result-section{background:#f8fafc;padding:1rem 1.25rem;border-radius:16px;margin:1rem 0;border:1px solid #e2e8f0;}
+.result-section-title{font-weight:700;color:#1e293b;margin-bottom:.75rem;font-size:15px;display:flex;align-items:center;}
+.result-section-title::before{content:'•';color:#667eea;font-size:24px;margin-right:8px;}
+.result-list{margin:0;padding-left:1.5rem;}
+.result-list li{margin-bottom:.5rem;color:#334155;line-height:1.6;font-size:14px;}
 
-/* Buttons - modern design */
-.stButton > button { 
-    width: 100%;
-    padding: 1rem 1.2rem;
-    font-size: 16px;
-    font-weight: 700;
-    border-radius: 16px;
-    border: none !important;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-.stButton > button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(0,0,0,0.15);
-}
-.stButton > button[kind="primary"] { 
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-    color: #fff !important;
-}
-.stButton > button[kind="secondary"] { 
-    background: #f1f5f9 !important;
-    color: #334155 !important;
-}
-
-/* Result sheet - improved */
-.sheet { 
-    border-radius: 24px 24px 0 0;
-    padding: 1.5rem;
-    background: white;
-    box-shadow: 0 -4px 24px rgba(0,0,0,0.12);
-    border: 1px solid rgba(0,0,0,0.06);
-    margin-top: 2rem;
-}
-
-.result-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1rem;
-    padding-bottom: 1rem;
-    border-bottom: 2px solid #f1f5f9;
-}
-
-.result-title {
-    font-weight: 800;
-    font-size: 20px;
-    color: #0f172a;
-}
-
-/* Badge - improved */
-.badge { 
-    display: inline-flex;
-    align-items: center;
-    padding: 8px 16px;
-    border-radius: 12px;
-    color: white;
-    font-weight: 800;
-    font-size: 14px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-}
-.badge::before {
-    content: '';
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: white;
-    margin-right: 8px;
-}
-.badge-ok { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
-.badge-no { background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); }
-.badge-unsure { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
-
-/* Result sections */
-.result-section {
-    background: #f8fafc;
-    padding: 1rem 1.25rem;
-    border-radius: 16px;
-    margin: 1rem 0;
-    border: 1px solid #e2e8f0;
-}
-
-.result-section-title {
-    font-weight: 700;
-    color: #1e293b;
-    margin-bottom: 0.75rem;
-    font-size: 15px;
-    display: flex;
-    align-items: center;
-}
-
-.result-section-title::before {
-    content: '•';
-    color: #667eea;
-    font-size: 24px;
-    margin-right: 8px;
-}
-
-.result-list {
-    margin: 0;
-    padding-left: 1.5rem;
-}
-
-.result-list li {
-    margin-bottom: 0.5rem;
-    color: #334155;
-    line-height: 1.6;
-    font-size: 14px;
-}
+/* Badge */
+.badge{display:inline-flex;align-items:center;padding:8px 16px;border-radius:12px;color:#fff;font-weight:800;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.15);}
+.badge::before{content:'';width:8px;height:8px;border-radius:50%;background:#fff;margin-right:8px;}
+.badge-ok{background:linear-gradient(135deg,#10b981 0%,#059669 100%);}
+.badge-no{background:linear-gradient(135deg,#ef4444 0%,#dc2626 100%);}
+.badge-unsure{background:linear-gradient(135deg,#f59e0b 0%,#d97706 100%);}
 
 /* Confidence bar */
-.confidence-bar {
-    background: #e2e8f0;
-    height: 8px;
-    border-radius: 999px;
-    overflow: hidden;
-    margin-top: 0.5rem;
-}
-
-.confidence-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-    border-radius: 999px;
-    transition: width 0.5s ease;
-}
-
-/* Alert messages */
-.stAlert {
-    border-radius: 16px;
-    padding: 1rem 1.25rem;
-}
-
-/* Progress bar */
-.stProgress > div > div {
-    border-radius: 999px;
-}
-
-/* Image preview */
-.image-preview {
-    border-radius: 20px;
-    overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-    margin: 1.5rem 0;
-}
-
-/* Loading animation */
-@keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-}
-
-.loading {
-    animation: pulse 1.5s ease-in-out infinite;
-}
-
-/* Responsive adjustments */
-@media (max-width: 640px) {
-    .header h1 { font-size: 24px; }
-    .result-title { font-size: 18px; }
-    .button-container { flex-direction: column; }
-}
+.confidence-bar{background:#e2e8f0;height:8px;border-radius:999px;overflow:hidden;margin-top:.5rem;}
+.confidence-fill{height:100%;background:linear-gradient(90deg,#667eea 0%,#764ba2 100%);border-radius:999px;transition:width .5s ease;}
+/* Preview */
+.image-preview{border-radius:20px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.15);margin:1.25rem 0;}
+@media (max-width: 640px){ .result-title{font-size:18px;} .button-container{flex-direction:column;} }
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
@@ -306,7 +122,7 @@ SCHEMA_HINT = (
 def esc(x: Any) -> str:
     return html.escape(str(x), quote=True)
 
-def badge(verdict: str) -> str:
+def badge_view(verdict: str) -> str:
     m = {
         "compliant": ("✓ ผ่านระเบียบ", "badge-ok"),
         "non_compliant": ("✗ ไม่ผ่านระเบียบ", "badge-no"),
@@ -359,7 +175,18 @@ USER (ไทย):
                     {"inline_data": {"mime_type": mime, "data": image_bytes}}
                 ]}],
             )
-            return parse_json_strict((resp.text or "").strip())
+            raw = (resp.text or "").strip()
+            try:
+                return parse_json_strict(raw)
+            except Exception as pe:
+                # Fallback: not pure JSON
+                return {
+                    "verdict": "unsure",
+                    "reasons": [f"รูปแบบผลลัพธ์ไม่ใช่ JSON ล้วน: {pe}", raw[:200]],
+                    "violations": [],
+                    "confidence": 0.0,
+                    "meta": {"rule_set_id": "default-v1"},
+                }
         except errors.ServerError as e:
             last_err = e
             if "503" in str(e) and i < retries - 1:
@@ -380,48 +207,51 @@ USER (ไทย):
     }
 
 # ----------------- Header -----------------
-st.markdown('''
+st.markdown("""
 <div class="header">
-    <h1>✂️ Hair Check</h1>
-    <p>ระบบตรวจสอบทรงผมนักเรียนอัตโนมัติ</p>
+  <h1>✂️ Hair Check</h1>
+  <p>ระบบตรวจสอบทรงผมนักเรียนอัตโนมัติ</p>
 </div>
-''', unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # Info card
-st.markdown('''
+st.markdown("""
 <div class="info-card">
-    <div class="info-card-title">📋 วิธีใช้งาน</div>
-    <div class="info-card-text">
-        1. กดปุ่ม "Take Photo" เพื่อถ่ายภาพ<br>
-        2. ตรวจสอบภาพที่ถ่ายให้ชัดเจน<br>
-        3. กดปุ่ม "🔎 ตรวจสอบ" เพื่อวิเคราะห์ทรงผม
-    </div>
+  <div class="info-card-title">📋 วิธีใช้งาน</div>
+  <div class="info-card-text">
+    1) กด “ถ่ายภาพ”<br>
+    2) ตรวจให้เห็นทรงผมชัดเจน (แสงพอ/ไม่ย้อนแสง/เห็นด้านข้าง)<br>
+    3) กด “ตรวจสอบ” เพื่อวิเคราะห์
+  </div>
 </div>
-''', unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # ----------------- Camera -----------------
 st.markdown('<div class="cam-box">', unsafe_allow_html=True)
 photo = st.camera_input("📸 ถ่ายภาพทรงผม")
 st.markdown("""
 <div class="overlay">
-    <div class="corner tl"></div>
-    <div class="corner tr"></div>
-    <div class="corner bl"></div>
-    <div class="corner br"></div>
+  <div class="corner tl"></div>
+  <div class="corner tr"></div>
+  <div class="corner bl"></div>
+  <div class="corner br"></div>
 </div>
 """, unsafe_allow_html=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
-# Hint
-st.markdown('<div style="text-align:center;"><span class="hint">💡 วางตำแหน่งใบหน้าให้อยู่ในกรอบสี่เหลี่ยม</span></div>', unsafe_allow_html=True)
+if photo is None:
+    st.info("ℹ️ หากไม่เห็นภาพจากกล้อง: ตรวจสิทธิ์กล้องของเบราว์เซอร์ และใช้งานบน HTTPS หรือ localhost เท่านั้น")
 
-# Buttons
-st.markdown('<div class="button-container">', unsafe_allow_html=True)
+# Hint
+st.markdown('<div style="text-align:center;"><span class="hint">จัดศีรษะให้อยู่ในกรอบ แล้วกด “ตรวจสอบ”</span></div>', unsafe_allow_html=True)
+
+# ----------------- Buttons (primary left / secondary right) -----------------
+st.markdown('<div class="button-container row-buttons">', unsafe_allow_html=True)
 col1, col2 = st.columns(2)
 with col1:
-    do_analyze = st.button("🔎 ตรวจสอบ", type="primary", use_container_width=True)
+    do_analyze = st.button("🔎 ตรวจสอบ", use_container_width=True)
 with col2:
-    clear = st.button("↺ ถ่ายใหม่", type="secondary", use_container_width=True)
+    clear = st.button("↺ ถ่ายใหม่", use_container_width=True)
 st.markdown('</div>', unsafe_allow_html=True)
 
 if clear:
@@ -437,27 +267,33 @@ if do_analyze:
         try:
             img = Image.open(photo).convert("RGB")
             mime = photo.type if photo.type in ("image/png", "image/jpeg") else "image/jpeg"
-            
-            # Show preview
+
+            # Preview
             st.markdown('<div class="image-preview">', unsafe_allow_html=True)
             st.image(img, caption="📷 ภาพที่ถ่าย", use_container_width=True)
             st.markdown('</div>', unsafe_allow_html=True)
 
-            # Progress
+            # Progress & compress
             prog = st.progress(0, text="⏳ กำลังเตรียมภาพ...")
             data = compress(img, mime)
+            # guard oversized payloads (>5MB)
+            if len(data) > 5 * 1024 * 1024:
+                st.warning("ไฟล์ภาพใหญ่เกินไป กำลังย่อเพิ่มเติม…")
+                img2 = img.copy()
+                img2.thumbnail((800, 800))
+                data = compress(img2, mime)
             prog.progress(35, text="📤 กำลังส่งไปตรวจ...")
 
             with st.spinner("🤖 ระบบ AI กำลังวิเคราะห์..."):
                 result = call_gemini(data, mime)
-            
+
             prog.progress(100, text="✅ เสร็จสิ้น")
-            time.sleep(0.5)
+            time.sleep(0.4)
             prog.empty()
-            
+
             st.success("✅ ตรวจสอบเสร็จสิ้น!")
             st.session_state["result"] = result
-            
+
         except Exception as e:
             st.error(f"❌ เกิดข้อผิดพลาด: {e}")
 
@@ -470,46 +306,39 @@ if res:
     conf = res.get("confidence", 0.0)
 
     st.markdown('<div class="sheet">', unsafe_allow_html=True)
-    
-    # Header
     st.markdown(f"""
     <div class="result-header">
-        <div class="result-title">📊 ผลการตรวจสอบ</div>
-        {badge(verdict)}
+      <div class="result-title">📊 ผลการตรวจสอบ</div>
+      {badge_view(verdict)}
     </div>
     """, unsafe_allow_html=True)
-    
-    # Confidence
+
     st.markdown(f"""
     <div class="result-section">
-        <div class="result-section-title">🎯 ความมั่นใจของระบบ</div>
-        <div style="font-size: 24px; font-weight: 800; color: #667eea;">{conf:.1%}</div>
-        <div class="confidence-bar">
-            <div class="confidence-fill" style="width: {conf*100}%;"></div>
-        </div>
+      <div class="result-section-title">🎯 ความมั่นใจของระบบ</div>
+      <div style="font-size: 24px; font-weight: 800; color: #667eea;">{conf:.1%}</div>
+      <div class="confidence-bar"><div class="confidence-fill" style="width:{conf*100}%;"></div></div>
     </div>
     """, unsafe_allow_html=True)
-    
-    # Reasons
+
     if reasons:
         st.markdown(f"""
         <div class="result-section">
-            <div class="result-section-title">💭 เหตุผลสรุป</div>
-            <ul class="result-list">
-                {''.join(f'<li>{esc(x)}</li>' for x in reasons)}
-            </ul>
+          <div class="result-section-title">💭 เหตุผลสรุป</div>
+          <ul class="result-list">
+            {''.join(f'<li>{esc(x)}</li>' for x in reasons)}
+          </ul>
         </div>
         """, unsafe_allow_html=True)
-    
-    # Violations
+
     if violations:
         st.markdown(f"""
         <div class="result-section">
-            <div class="result-section-title">⚠️ จุดที่ไม่ตรงกับระเบียบ</div>
-            <ul class="result-list">
-                {''.join(f'<li><b>{esc(v.get("code", "N/A"))}</b>: {esc(v.get("message", ""))}</li>' for v in violations)}
-            </ul>
+          <div class="result-section-title">⚠️ จุดที่ไม่ตรงกับระเบียบ</div>
+          <ul class="result-list">
+            {''.join(f'<li><b>{esc(v.get("code","N/A"))}</b>: {esc(v.get("message",""))}</li>' for v in violations)}
+          </ul>
         </div>
         """, unsafe_allow_html=True)
-    
+
     st.markdown('</div>', unsafe_allow_html=True)
