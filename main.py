@@ -10,6 +10,27 @@ st.set_page_config(page_title="ตรวจทรงผมนักเรีย�
 
 MOBILE_CSS = """
 <style>
+...
+.result-card {
+  border-radius: 16px;
+  padding: 1rem 1.1rem;
+  margin-top: 0.6rem;
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+  background: #fff;
+}
+/* เพิ่มบรรทัดเหล่านี้ */
+.result-card,
+.result-card * { color: #0f172a !important; }
+.result-card hr { border-color: rgba(0,0,0,0.12) !important; }
+
+.badge { ... color:#fff; }
+.badge-ok { background:#16a34a; }
+.badge-no { background:#dc2626; }
+.badge-unsure { background:#f59e0b; }
+...
+</style>
+<style>
 /* ฟอนต์และ layout */
 html, body, [class*="css"]  { font-size: 18px; }
 div.block-container { padding-top: 0.6rem; padding-bottom: 2.4rem; }
@@ -47,16 +68,6 @@ div.block-container { padding-top: 0.6rem; padding-bottom: 2.4rem; }
   box-shadow: 0 2px 10px rgba(0,0,0,0.06);
   background: #f9fafb; /* เทาอ่อนเพื่อให้ badge เด่น */
 }
-.result-card,
-.result-card * { color: #0f172a !important; }
-.result-card hr { border-color: rgba(0,0,0,0.12) !important; }
-
-.badge { ... color:#fff; }
-.badge-ok { background:#16a34a; }
-.badge-no { background:#dc2626; }
-.badge-unsure { background:#f59e0b; }
-...
-</style>
 /* ป้ายผลลัพธ์ (badge) */
 .badge {
   display:inline-block;
@@ -290,6 +301,7 @@ if st.session_state.get("last_result"):
 
     st.divider()
     st.caption("ถ้าผลไม่ชัดเจน: ลองถ่ายใหม่ให้เห็นด้านข้างศีรษะและใบหูชัดเจนขึ้น")
+
 
 
 
