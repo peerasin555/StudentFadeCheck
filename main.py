@@ -10,13 +10,13 @@ st.set_page_config(page_title="ตรวจทรงผมนักเรีย�
 
 MOBILE_CSS = """
 <style>
-/* ฐานฟอนต์และระยะห่างสำหรับมือถือ */
+/* ฟอนต์และ layout */
 html, body, [class*="css"]  { font-size: 18px; }
 div.block-container { padding-top: 0.6rem; padding-bottom: 2.4rem; }
 
-/* กล่องคำแนะนำด้านบน */
+/* กล่องคำแนะนำ */
 .hint-bar {
-  background: #f1f5f9;
+  background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   padding: 0.8rem 1rem;
@@ -31,9 +31,12 @@ div.block-container { padding-top: 0.6rem; padding-bottom: 2.4rem; }
   font-size: 1.12rem;
   font-weight: 700;
   border-radius: 14px;
+  transition: all .15s ease;
 }
 .btn-primary { background: #2563eb !important; color:#fff !important; border: none !important; }
+.btn-primary:hover { background: #1e40af !important; }
 .btn-secondary { background: #e2e8f0 !important; color:#0f172a !important; border: none !important; }
+.btn-secondary:hover { background: #cbd5e1 !important; }
 
 /* การ์ดผลลัพธ์ */
 .result-card {
@@ -42,32 +45,35 @@ div.block-container { padding-top: 0.6rem; padding-bottom: 2.4rem; }
   margin-top: 0.6rem;
   border: 1px solid rgba(0,0,0,0.08);
   box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-  background: #fff;
+  background: #f9fafb; /* เทาอ่อนเพื่อให้ badge เด่น */
 }
+
+/* ป้ายผลลัพธ์ (badge) */
 .badge {
   display:inline-block;
-  padding: 0.2rem 0.66rem;
+  padding: 0.35rem 0.9rem;
   border-radius: 999px;
   font-weight: 700;
-  font-size: 0.98rem;
+  font-size: 1rem;
   color: #fff;
+  border: 2px solid #fff; /* ขอบขาวตัดพื้นหลัง */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.15);
 }
-.badge-ok { background: #16a34a; }       /* ผ่าน */
-.badge-no { background: #dc2626; }       /* ไม่ผ่าน */
-.badge-unsure { background: #f59e0b; }   /* ไม่แน่ใจ */
+
+/* สีตัดพื้นหลังชัด */
+.badge-ok { background: #22c55e; }        /* เขียวสด ผ่าน */
+.badge-no { background: #ef4444; }        /* แดงสด ไม่ผ่าน */
+.badge-unsure { background: #f59e0b; }    /* เหลืองสด ไม่แน่ใจ */
 
 /* กล้อง/label ให้ชัด */
 [data-testid="stCameraInputLabel"] { font-size: 1.05rem; }
 
-/* ช่องกรอก/textarea ใหญ่พอสำหรับนิ้ว */
+/* อินพุตใหญ่พอสำหรับนิ้ว */
 textarea, input, .stTextInput input { font-size: 1rem !important; }
 
-/* กลุ่มปุ่มแนวนอน */
-.btn-row { display:flex; gap:12px; }
-.btn-row > div { flex:1; }
-
 /* รายการเหตุผล */
-.result-list { margin: 0.4rem 0 0 1rem; }
+.result-list { margin: 0.4rem 0 0 1.1rem; }
+.result-list li { margin-bottom: 0.2rem; }
 </style>
 """
 st.markdown(MOBILE_CSS, unsafe_allow_html=True)
@@ -275,4 +281,5 @@ if st.session_state.get("last_result"):
 
     st.divider()
     st.caption("ถ้าผลไม่ชัดเจน: ลองถ่ายใหม่ให้เห็นด้านข้างศีรษะและใบหูชัดเจนขึ้น")
+
 
