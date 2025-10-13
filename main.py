@@ -90,8 +90,8 @@ rule_set_id = "default-v1"
     }
 
 # ----------------- Streamlit UI -----------------
-st.set_page_config(page_title="ตรวจทรงผมนักเรียน (MVP)", page_icon="✂️", layout="centered")
-st.title("✂️ ตรวจทรงผมนักเรียน (MVP) – กล้องเว็บ + Gemini")
+st.set_page_config(page_title="ตรวจทรงผมนักเรียน", page_icon="✂️", layout="centered")
+st.title("✂️ ตรวจทรงผมนักเรียนด้วย - Gemini")
 
 student_id = st.text_input("รหัสนักเรียน (ไม่บังคับ):", "")
 
