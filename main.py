@@ -197,11 +197,14 @@ st.markdown(
 # ===================== โหมดผู้เชี่ยวชาญ (ซ่อนเป็นค่าเริ่มต้น) =====================
 with st.expander("ตัวเลือกผู้เชี่ยวชาญ (แก้ไขกฎระเบียบ/ตั้งค่าเพิ่มเติม)"):
     rules = st.text_area("กฎระเบียบ (ปรับได้)", DEFAULT_RULES, height=120)
+
+# ถ้าไม่ได้เปิด expander ให้ใช้กฎเริ่มต้น
+if "rules_cache" not in st.session_state:
+    st.session_state.rules_cache = DEFAULT_RULES
+if not rules:
+    rules = st.session_state.rules_cache
 else:
-    # ถ้าไม่ขยาย expander ให้ใช้ค่าเริ่มต้น
-    if "rules_cache" not in st.session_state:
-        st.session_state.rules_cache = DEFAULT_RULES
-    rules = st.session_state.get("rules_cache", DEFAULT_RULES)
+    st.session_state.rules_cache = rules
 
 # ===================== ฟอร์มเดียว: รหัส + กล้อง + ปุ่มยืนยัน =====================
 with st.form("capture_form", clear_on_submit=False):
@@ -272,3 +275,4 @@ if st.session_state.get("last_result"):
 
     st.divider()
     st.caption("ถ้าผลไม่ชัดเจน: ลองถ่ายใหม่ให้เห็นด้านข้างศีรษะและใบหูชัดเจนขึ้น")
+
