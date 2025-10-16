@@ -117,8 +117,13 @@ def call_gemini(image_bytes: bytes, mime: str, retries: int = 2) -> Dict[str, An
     api_key = (getattr(st, "secrets", {}).get("GEMINI_API_KEY", None)
                if hasattr(st, "secrets") else None) or os.getenv("GEMINI_API_KEY")
     if not api_key:
-        return {"verdict":"unsure","reasons"🙁"ยังไม่ได้ตั้งค่า GEMINI_API_KEY"],"violations":[],"confidence":0.0,"meta":{"rule_set_id":"default-v1"}}
-
+return {
+    "verdict": "unsure",
+    "reasons": ["ยังไม่ได้ตั้งค่า GEMINI_API_KEY"],
+    "violations": [],
+    "confidence": 0.0,
+    "meta": {"rule_set_id": "default-v1"}
+}
     client = genai.Client(api_key=api_key)
     prompt = f"""SYSTEM:
 คุณเป็นผู้ช่วยตรวจทรงผมนักเรียน ให้ตอบเป็น JSON เท่านั้น
@@ -275,4 +280,5 @@ st.markdown(f"""
   })();
 </script>
 """, unsafe_allow_html=True)
+
 
