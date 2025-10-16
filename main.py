@@ -1,4 +1,4 @@
-# app.py — Mobile-first HTML/CSS UI + Streamlit camera + Gemini backend
+# app.py — Mobile-first HTML/CSS UI + Streamlit camera + Gemini backend + Icon bottom nav
 import os, io, json, html, time
 from typing import Any, Dict, List
 from PIL import Image
@@ -13,14 +13,12 @@ st.set_page_config(page_title="Hair Check", page_icon="✂️", layout="wide")
 st.markdown("""
 <style>
 :root{
-  --bg:#f6f7fb; --card:#ffffff; --ink:#0f172a; --muted:#64748b;
-  --ok:#10b981; --no:#ef4444; --unsure:#f59e0b; --br:#e5e7eb;
-  --b1:#667eea; --b2:#764ba2;
+  --bg:#f6f7fb; --card:#ffffff; --ink:#0f172a; --muted:#64748b; --br:#e5e7eb;
+  --ok:#10b981; --no:#ef4444; --unsure:#f59e0b; --b1:#667eea; --b2:#764ba2;
 }
 html,body,[class*="css"]{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui;
   color:var(--ink); font-size:16px;}
 div.block-container{max-width:720px; padding:1rem 1rem 5.5rem; background:var(--bg);}
-
 a{color:inherit; text-decoration:none}
 
 /* Top app bar */
@@ -70,7 +68,7 @@ a{color:inherit; text-decoration:none}
 /* --- Bottom nav (icon only) --- */
 .nav{
   position:fixed; left:0; right:0; bottom:0;
-  background:#fff; border-top:1px solid #e5e7eb;
+  background:#fff; border-top:1px solid var(--br);
   display:flex; justify-content:space-around; padding:10px 8px; z-index:10
 }
 .nav a{
@@ -162,83 +160,31 @@ USER (ไทย):
             last_err = e; break
     return {"verdict":"unsure","reasons":[f"เกิดข้อผิดพลาด: {last_err}"],"violations":[],"confidence":0.0,"meta":{"rule_set_id":"default-v1"}}
 
-# ---------- Nav via query parameter ----------
-qp = st.query_params  # Streamlit >=1.30
-tab = qp.get("tab", "Home")
+# ---------- Query param helpers (compatible with older Streamlit) ----------
+def get_tab() -> str:
+    try:
+        qp = st.query_params
+        return qp.get("tab", "Home")
+    except Exception:
+        q = st.experimental_get_query_params()
+        return (q.get("tab", ["Home"]) or ["Home"])[0]
 
-def nav_bar(active: str):
-    # SVG ไอคอนแบบ inline (ไม่พึ่ง CDN)
-    ICONS = {
-        "Home": """
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path d="M3 10.5 12 3l9 7.5" />
-              <path d="M5 10v10h14V10" />
-            </svg>
-        """,
-        "Check": """
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <rect x="3" y="3" width="18" height="18" rx="4" />
-              <path d="M8 12h8M12 8v8" />
-            </svg>
-        """,
-        "History": """
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path d="M3 13a9 9 0 1 0 3-7.4l-3 3.4" />
-              <path d="M3 3v6h6" />
-              <path d="M12 7v5l3 3" />
-            </svg>
-        """,
-        "Settings": """
-            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-              <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
-              <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.03.03a2 2 0 1 1-2.83 2.83l-.03-.03A1.8 1.8 0 0 0 15 19.4a1.8 1.8 0 0 0-1 .31 1.8 1.8 0 0 0-.9 1.56v.06a2 2 0 1 1-4 0v-.06A1.8 1.8 0 0 0 7 19.4a1.8 1.8 0 0 0-1.96-.36l-.03.03a2 2 0 1 1-2.83-2.83l.03-.03A1.8 1.8 0 0 0 4.6 15 1.8 1.8 0 0 0 4.29 14a1.8 1.8 0 0 0-1.56-.9H2.67a2 2 0 1 1 0-4h.06A1.8 1.8 0 0 0 4.29 8a1.8 1.8 0 0 0 .31-1 1.8 1.8 0 0 0-.36-1.96l-.03-.03A2 2 0 1 1 7.04 1.18l.03.03A1.8 1.8 0 0 0 8 4.6c.3 0 .68-.1 1-.31.3-.2.7-.29 1.06-.3h.06a2 2 0 1 1 4 0h.06c.36.01.76.1 1.06.3.32.21.7.31 1 .31A1.8 1.8 0 0 0 19.4 5l.03-.03a2 2 0 1 1 2.83 2.83L22.2 7.83A1.8 1.8 0 0 0 19.4 9c0 .3.1.68.31 1 .2.3.29.7.3 1.06v.06Z" />
-            </svg>
-        """,
-    }
+def set_tab(name: str):
+    try:
+        st.query_params.update({"tab": name})
+    except Exception:
+        st.experimental_set_query_params(tab=name)
 
-    def item(name: str) -> str:
-        cls = "active" if active == name else ""
-        return f'''
-          <a href="#" class="{cls}" data-tab="{name}">
-            <span class="icon">{ICONS[name]}</span>
-            <span>{name}</span>
-          </a>
-        '''
-
-    st.markdown(f"""
-    <div class="nav" id="bottom-nav">
-      {item("Home")}
-      {item("Check")}
-      {item("History")}
-      {item("Settings")}
-    </div>
-    <script>
-      // จับคลิก -> เปลี่ยน query param tab แบบ in-place (ไม่เปิดแท็บใหม่)
-      (function() {{
-        const nav = document.getElementById('bottom-nav');
-        if (!nav) return;
-        nav.querySelectorAll('a[data-tab]').forEach(a => {{
-          a.addEventListener('click', (ev) => {{
-            ev.preventDefault();
-            const tab = a.getAttribute('data-tab');
-            const url = new URL(window.location.href);
-            url.searchParams.set('tab', tab);
-            // เปลี่ยน URL โดยไม่เปิดแท็บใหม่ แล้ว reload เพื่อให้ Python วาดหน้าใหม่
-            window.history.replaceState(null, '', url.toString());
-            window.location.reload();
-          }});
-        }});
-      }})();
-    </script>
-    """, unsafe_allow_html=True)
+tab = get_tab()
 
 # ---------- AppBar ----------
 st.markdown('<div class="appbar"><h1>Pet-style Hair Check</h1></div>', unsafe_allow_html=True)
 
-# ---------- Pages ----------
+# ---------- State ----------
 if "history" not in st.session_state:
     st.session_state.history: List[Dict[str,Any]] = []
 
+# ---------- Pages ----------
 def page_home():
     st.markdown('<a class="bigbtn" href="?tab=Check">🧑‍🎓 ตรวจทรงผมของนักเรียน<small>เปิดกล้องและวิเคราะห์อัตโนมัติ</small></a>', unsafe_allow_html=True)
     st.markdown("")
@@ -286,7 +232,7 @@ def page_check():
         st.markdown('<ul>'+ ''.join(f'<li>{esc(v.get("message",""))}</li>' for v in violations) +'</ul>', unsafe_allow_html=True)
     st.download_button("⬇️ ดาวน์โหลดผลลัพธ์ (JSON)", data=json.dumps(res, ensure_ascii=False, indent=2),
                        file_name="haircheck_result.json", mime="application/json", use_container_width=True)
-    st.button("↺ ลบและถ่ายใหม่", type="secondary", use_container_width=True, on_click=lambda: st.query_params.update({"tab":"Check"}))
+    st.button("↺ ลบและถ่ายใหม่", type="secondary", use_container_width=True, on_click=lambda: set_tab("Check"))
 
 def page_history():
     st.markdown('<div class="card"><div class="row"><div class="avatar"></div><div><b>Top rated</b><div class="meta">ผลที่เชื่อถือได้มากสุดล่าสุด</div></div></div></div>', unsafe_allow_html=True)
@@ -317,6 +263,66 @@ elif tab == "Check": page_check()
 elif tab == "History": page_history()
 else: page_settings()
 
-# ---------- Bottom Nav ----------
-nav_bar(tab)
+# ---------- Bottom Nav (icon + in-place switching) ----------
+def nav_bar(active: str):
+    ICONS = {
+        "Home": """
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 10.5 12 3l9 7.5" />
+              <path d="M5 10v10h14V10" />
+            </svg>
+        """,
+        "Check": """
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <rect x="3" y="3" width="18" height="18" rx="4" />
+              <path d="M8 12h8M12 8v8" />
+            </svg>
+        """,
+        "History": """
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 13a9 9 0 1 0 3-7.4l-3 3.4" />
+              <path d="M3 3v6h6" />
+              <path d="M12 7v5l3 3" />
+            </svg>
+        """,
+        "Settings": """
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+              <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.03.03a2 2 0 1 1-2.83 2.83l-.03-.03A1.8 1.8 0 0 0 15 19.4a1.8 1.8 0 0 0-1 .31 1.8 1.8 0 0 0-.9 1.56v.06a2 2 0 1 1-4 0v-.06A1.8 1.8 0 0 0 7 19.4a1.8 1.8 0 0 0-1.96-.36l-.03.03a2 2 0 1 1-2.83-2.83l.03-.03A1.8 1.8 0 0 0 4.6 15 1.8 1.8 0 0 0 4.29 14a1.8 1.8 0 0 0-1.56-.9H2.67a2 2 0 1 1 0-4h.06A1.8 1.8 0 0 0 4.29 8a1.8 1.8 0 0 0 .31-1 1.8 1.8 0 0 0-.36-1.96l-.03-.03A2 2 0 1 1 7.04 1.18l.03.03A1.8 1.8 0 0 0 8 4.6c.3 0 .68-.1 1-.31.3-.2.7-.29 1.06-.3h.06a2 2 0 1 1 4 0h.06c.36.01.76.1 1.06.3.32.21.7.31 1 .31A1.8 1.8 0 0 0 19.4 5l.03-.03a2 2 0 1 1 2.83 2.83L22.2 7.83A1.8 1.8 0 0 0 19.4 9c0 .3.1.68.31 1 .2.3.29.7.3 1.06v.06Z" />
+            </svg>
+        """,
+    }
+    def item(name: str) -> str:
+        cls = "active" if active == name else ""
+        return f'''
+          <a href="#" class="{cls}" data-tab="{name}">
+            <span class="icon">{ICONS[name]}</span>
+            <span>{name}</span>
+          </a>
+        '''
+    st.markdown(f"""
+    <div class="nav" id="bottom-nav">
+      {item("Home")}
+      {item("Check")}
+      {item("History")}
+      {item("Settings")}
+    </div>
+    <script>
+      (function() {{
+        const nav = document.getElementById('bottom-nav');
+        if (!nav) return;
+        nav.querySelectorAll('a[data-tab]').forEach(a => {{
+          a.addEventListener('click', (ev) => {{
+            ev.preventDefault();
+            const tab = a.getAttribute('data-tab');
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', tab);
+            window.history.replaceState(null, '', url.toString());
+            window.location.reload(); // สลับหน้าในแท็บเดิม
+          }});
+        }});
+      }})();
+    </script>
+    """, unsafe_allow_html=True)
 
+nav_bar(tab)
