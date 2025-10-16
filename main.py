@@ -100,8 +100,11 @@ def compress(img: Image.Image, mime: str) -> bytes:
     else: img.save(buf,"JPEG",quality=85, optimize=True)
     return buf.getvalue()
 def badge_view(verdict: str) -> str:
-    mapping = {"compliant"🙁"ผ่านระเบียบ","ok"), "non_compliant"🙁"ไม่ผ่านระเบียบ","no"), "unsure"🙁"ไม่แน่ใจ","unsure")}
-    label, cls = mapping.get(verdict, ("ไม่แน่ใจ","unsure"))
+    mapping = {
+    "compliant": ("ผ่านระเบียบ", "ok"),
+    "non_compliant": ("ไม่ผ่านระเบียบ", "no"),
+    "unsure": ("ไม่แน่ใจ", "unsure"),
+}
     return f'<span class="badge {cls}">● {label}</span>'
 def parse_json_strict(text: str) -> Dict[str, Any]:
     s, e = text.find("{"), text.rfind("}")
@@ -272,3 +275,4 @@ st.markdown(f"""
   })();
 </script>
 """, unsafe_allow_html=True)
+
