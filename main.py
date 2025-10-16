@@ -1,4 +1,4 @@
-# app.py — Mobile-first UI, bottom nav via query param (no hidden buttons, no empty squares)
+# app.py — Bottom nav forces same-tab navigation (no new tab), icons + JS intercept
 import os, io, json, html, time
 from typing import Any, Dict, List
 from PIL import Image
@@ -28,13 +28,11 @@ a{color:inherit; text-decoration:none}
   box-shadow:0 6px 28px rgba(102,126,234,.25); margin-bottom:14px}
 .appbar h1{font-size:20px; margin:0; font-weight:900; letter-spacing:.3px}
 
-/* Home big cards */
+/* Cards */
+.card{background:var(--card); border:1px solid var(--br); border-radius:16px; padding:14px; box-shadow:0 2px 12px rgba(0,0,0,.05);}
 .bigbtn{display:block; background:var(--card); border-radius:16px; padding:18px; border:1px solid var(--br);
   box-shadow:0 2px 12px rgba(0,0,0,.05); font-weight:800; text-align:left}
 .bigbtn small{display:block; color:var(--muted); font-weight:600}
-
-/* Cards / lists */
-.card{background:var(--card); border:1px solid var(--br); border-radius:16px; padding:14px 14px; box-shadow:0 2px 12px rgba(0,0,0,.05);}
 .row{display:flex; gap:12px; align-items:center}
 .avatar{width:48px; height:48px; border-radius:12px; background:#e5e7eb}
 .meta{color:var(--muted); font-size:13px}
@@ -47,7 +45,7 @@ a{color:inherit; text-decoration:none}
 [data-testid="stCameraInput"]{position:relative; display:inline-block; width:100%}
 [data-testid="stCameraInput"] video, [data-testid="stCameraInput"] img{width:100%; border-radius:16px; box-shadow:0 4px 20px rgba(0,0,0,.08)}
 
-/* Overlay corners */
+/* Overlay corners (decorative) */
 .overlay{pointer-events:none; position:relative; margin-top:-56px; height:0}
 .corner{position:absolute; width:48px; height:48px; border:3px solid #fff; opacity:.95; border-radius:12px}
 .tl{left:18px; top:-290px; border-right:none;border-bottom:none}
@@ -66,7 +64,7 @@ a{color:inherit; text-decoration:none}
 .result{background:var(--card); border:1px solid var(--br); border-radius:16px; padding:14px; box-shadow:0 2px 12px rgba(0,0,0,.05)}
 .result h3{margin:.2rem 0 .3rem 0}
 
-/* Bottom nav (pure anchors — no hidden buttons, no JS) */
+/* Bottom nav (anchor links + JS intercept) */
 .nav{position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--br);
   display:flex; justify-content:space-around; padding:8px 4px; z-index:10}
 .nav a{
@@ -78,7 +76,7 @@ a{color:inherit; text-decoration:none}
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- Shared contents ----------
+# ---------- Shared ----------
 RULES = (
     "กฎระเบียบทรงผม (ชาย)\n"
     "1) รองทรงสูง ด้านข้าง/ด้านหลังสั้น\n"
@@ -87,7 +85,7 @@ RULES = (
 )
 SCHEMA_HINT = (
     'จงตอบเป็น JSON เท่านั้น ตามสคีมา:\n'
-    '{"verdict":"compliant | non_compliant | unsure","reasons":["string"],'
+    '{"verdict":"compliant | non_compliant | unsure","reasons"🙁"string"],'
     '"violations":[{"code":"STRING","message":"STRING"}],"confidence":0.0,'
     '"meta":{"rule_set_id":"default-v1","timestamp":"AUTO"}}'
 )
@@ -95,19 +93,16 @@ SCHEMA_HINT = (
 # ---------- Utils ----------
 def esc(x: Any) -> str:
     return html.escape(str(x), quote=True)
-
 def compress(img: Image.Image, mime: str) -> bytes:
     img = img.copy(); img.thumbnail((1024,1024))
     buf = io.BytesIO()
     if mime == "image/png": img.save(buf,"PNG",optimize=True)
     else: img.save(buf,"JPEG",quality=85, optimize=True)
     return buf.getvalue()
-
 def badge_view(verdict: str) -> str:
-    mapping = {"compliant":("ผ่านระเบียบ","ok"), "non_compliant":("ไม่ผ่านระเบียบ","no"), "unsure":("ไม่แน่ใจ","unsure")}
+    mapping = {"compliant"🙁"ผ่านระเบียบ","ok"), "non_compliant"🙁"ไม่ผ่านระเบียบ","no"), "unsure"🙁"ไม่แน่ใจ","unsure")}
     label, cls = mapping.get(verdict, ("ไม่แน่ใจ","unsure"))
     return f'<span class="badge {cls}">● {label}</span>'
-
 def parse_json_strict(text: str) -> Dict[str, Any]:
     s, e = text.find("{"), text.rfind("}")
     if s == -1 or e == -1:
@@ -119,7 +114,7 @@ def call_gemini(image_bytes: bytes, mime: str, retries: int = 2) -> Dict[str, An
     api_key = (getattr(st, "secrets", {}).get("GEMINI_API_KEY", None)
                if hasattr(st, "secrets") else None) or os.getenv("GEMINI_API_KEY")
     if not api_key:
-        return {"verdict":"unsure","reasons":["ยังไม่ได้ตั้งค่า GEMINI_API_KEY"],"violations":[],"confidence":0.0,"meta":{"rule_set_id":"default-v1"}}
+        return {"verdict":"unsure","reasons"🙁"ยังไม่ได้ตั้งค่า GEMINI_API_KEY"],"violations":[],"confidence":0.0,"meta":{"rule_set_id":"default-v1"}}
 
     client = genai.Client(api_key=api_key)
     prompt = f"""SYSTEM:
@@ -156,17 +151,18 @@ USER (ไทย):
             last_err = e; break
     return {"verdict":"unsure","reasons":[f"เกิดข้อผิดพลาด: {last_err}"],"violations":[],"confidence":0.0,"meta":{"rule_set_id":"default-v1"}}
 
-# ---------- Router with query param (no new tab) ----------
+# ---------- Router with query param ----------
 qp = st.query_params
-tab = qp.get("tab", "Home")  # default
+tab = qp.get("tab", "Home")
 
 # ---------- AppBar ----------
 st.markdown('<div class="appbar"><h1>Pet-style Hair Check</h1></div>', unsafe_allow_html=True)
 
-# ---------- App pages ----------
+# ---------- App state ----------
 if "history" not in st.session_state:
     st.session_state.history: List[Dict[str,Any]] = []
 
+# ---------- Pages ----------
 def page_home():
     st.markdown('<a class="bigbtn" href="?tab=Check">🧑‍🎓 ตรวจทรงผมของนักเรียน<small>เปิดกล้องและวิเคราะห์อัตโนมัติ</small></a>', unsafe_allow_html=True)
     st.markdown("")
@@ -194,10 +190,8 @@ def page_check():
     with st.spinner("🤖 กำลังวิเคราะห์…"):
         res = call_gemini(data, mime)
 
-    # เก็บประวัติ
     st.session_state.history.insert(0, {"time": time.strftime("%Y-%m-%d %H:%M"), "result": res})
 
-    # แสดงผล
     v = res.get("verdict","unsure")
     reasons = res.get("reasons",[]) or []
     violations = res.get("violations",[]) or []
@@ -212,8 +206,6 @@ def page_check():
     if violations:
         st.markdown('<div style="margin:.6rem 0 .2rem;font-weight:800;">จุดที่ไม่ตรงระเบียบ</div>', unsafe_allow_html=True)
         st.markdown('<ul>'+ ''.join(f'<li>{esc(v.get("message",""))}</li>' for v in violations) +'</ul>', unsafe_allow_html=True)
-    st.download_button("⬇️ ดาวน์โหลดผลลัพธ์ (JSON)", data=json.dumps(res, ensure_ascii=False, indent=2),
-                       file_name="haircheck_result.json", mime="application/json", use_container_width=True)
 
 def page_history():
     st.markdown('<div class="card"><div class="row"><div class="avatar"></div><div><b>Top rated</b><div class="meta">ผลที่เชื่อถือได้มากสุดล่าสุด</div></div></div></div>', unsafe_allow_html=True)
@@ -244,11 +236,11 @@ elif tab == "Check": page_check()
 elif tab == "History": page_history()
 else: page_settings()
 
-# ---------- Bottom nav (anchor links, no new tab) ----------
+# ---------- Bottom nav (anchors + JS to force same-tab) ----------
 def nav_item(name, icon_svg):
     active = "active" if tab == name else ""
-    # ใช้ anchor href="?tab=..." โหลดหน้าเดิมในแท็บเดิม
-    return f'<a class="{active}" href="?tab={name}" aria-label="{name}">{icon_svg}{name}</a>'
+    # ใช้ href="#" + data-tab เพื่อไม่ให้เบราว์เซอร์ตัดสินใจเอง
+    return f'<a class="{active}" href="#" data-tab="{name}" aria-label="{name}" rel="nofollow">{icon_svg}{name}</a>'
 
 svg_home = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9.5 12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V9.5z" stroke-width="1.7"/></svg>'
 svg_check = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.33 0-8 2.17-8 5v1h16v-1c0-2.83-3.67-5-8-5Z" stroke-width="1.7"/></svg>'
@@ -256,10 +248,27 @@ svg_hist = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="
 svg_sett = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 15.5a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5Zm7.94-1.5.9 1.56-2.06 3.56-1.8-.66a8.82 8.82 0 0 1-1.56.9l-.27 1.91H8.85l-.27-1.91a8.82 8.82 0 0 1-1.56-.9l-1.8.66L3.16 15.6l.9-1.56a8.82 8.82 0 0 1 0-1.56L3.16 10.9l2.06-3.56 1.8.66a8.82 8.82 0 0 1 1.56-.9l.27-1.91h4.34l.27 1.91a8.82 8.82 0 0 1 1.56.9l1.8-.66 2.06 3.56-.9 1.8a8.82 8.82 0 0 1 0 1.56Z" stroke-width="1.2"/></svg>'
 
 st.markdown(f"""
-<div class="nav">
+<div class="nav" id="nav">
   {nav_item("Home", svg_home)}
   {nav_item("Check", svg_check)}
   {nav_item("History", svg_hist)}
   {nav_item("Settings", svg_sett)}
 </div>
+<script>
+  (function(){
+    const nav = document.getElementById('nav');
+    if(!nav) return;
+    nav.querySelectorAll('a[data-tab]').forEach(a=>{
+      a.addEventListener('click', function(e){
+        e.preventDefault(); e.stopPropagation();
+        const tab = this.getAttribute('data-tab');
+        if(!tab) return;
+        // ใช้ History API เพื่ออยู่แท็บเดิมเสมอ
+        const url = new URL(window.location.href);
+        url.searchParams.set('tab', tab);
+        window.location.assign(url.toString()); // same-tab navigation
+      }, {passive:false});
+    });
+  })();
+</script>
 """, unsafe_allow_html=True)
