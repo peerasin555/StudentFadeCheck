@@ -1,8 +1,9 @@
-# app.py — Mobile-first UI, bottom nav with SVG icons, in-tab page switch (FIXED KEYS)
+# app.py — Mobile-first UI, bottom nav with SVG icons, in-tab page switch (FIXED KEYS, WIRED SETTINGS)
 import os, io, json, html, time
-from typing import Any, Dict, List
-from PIL import Image
+from typing import Any, Dict, List, Optional
+from PIL import Image, UnidentifiedImageError
 import streamlit as st
+from streamlit.components.v1 import html as components_html
 from google import genai
 from google.genai import errors
 
@@ -78,8 +79,8 @@ a{color:inherit; text-decoration:none}
 </style>
 """, unsafe_allow_html=True)
 
-# ---------- Shared contents ----------
-RULES = (
+# ---------- Defaults / Schema ----------
+DEFAULT_RULES = (
     "กฎระเบียบทรงผม (ชาย)\n"
     "1) รองทรงสูง ด้านข้าง/ด้านหลังสั้น\n"
     "2) ด้านบนยาวไม่เกิน 5 ซม.\n"
@@ -99,8 +100,10 @@ def esc(x: Any) -> str:
 def compress(img: Image.Image, mime: str) -> bytes:
     img = img.copy(); img.thumbnail((1024,1024))
     buf = io.BytesIO()
-    if mime == "image/png": img.save(buf,"PNG",optimize=True)
-    else: img.save(buf,"JPEG",quality=85, optimize=True)
+    if mime == "image/png":
+        img.save(buf, "PNG", optimize=True)
+    else:
+        img.save(buf, "JPEG", quality=85, optimize=True)
     return buf.getvalue()
 
 def badge_view(verdict: str) -> str:
@@ -114,23 +117,42 @@ def parse_json_strict(text: str) -> Dict[str, Any]:
         raise ValueError("no JSON object found")
     return json.loads(text[s:e+1])
 
-# ---------- Gemini ----------
-def call_gemini(image_bytes: bytes, mime: str, retries: int = 2) -> Dict[str, Any]:
-    api_key = (getattr(st, "secrets", {}).get("GEMINI_API_KEY", None)
-               if hasattr(st, "secrets") else None) or os.getenv("GEMINI_API_KEY")
+# ---------- Secrets / Client ----------
+def _get_env_api_key() -> Optional[str]:
+    key = os.getenv("GEMINI_API_KEY")
+    if key:
+        return key
+    try:
+        # st.secrets behaves like a dict but guard for environments without it
+        if hasattr(st, "secrets") and st.secrets:
+            return st.secrets.get("GEMINI_API_KEY", None)  # type: ignore[attr-defined]
+    except Exception:
+        pass
+    return None
+
+@st.cache_resource(show_spinner=False)
+def get_gemini_client() -> Optional[genai.Client]:
+    api_key = _get_env_api_key()
     if not api_key:
+        return None
+    return genai.Client(api_key=api_key)
+
+# ---------- Gemini ----------
+def call_gemini(image_bytes: bytes, mime: str, rules_text: str, retries: int = 2) -> Dict[str, Any]:
+    client = get_gemini_client()
+    if not client:
         return {"verdict":"unsure","reasons":["ยังไม่ได้ตั้งค่า GEMINI_API_KEY"],"violations":[],"confidence":0.0,"meta":{"rule_set_id":"default-v1"}}
 
-    client = genai.Client(api_key=api_key)
     prompt = f"""SYSTEM:
 คุณเป็นผู้ช่วยตรวจทรงผมนักเรียน ให้ตอบเป็น JSON เท่านั้น
 USER (ไทย):
 ตรวจรูปนี้ตามกฎ:
-{RULES}
+{rules_text}
 
 {SCHEMA_HINT}
 - ถ้ารูปไม่ชัด ให้ verdict="unsure" พร้อมเหตุผล
 """
+
     last_err = None
     for i in range(retries):
         try:
@@ -145,20 +167,37 @@ USER (ไทย):
             try:
                 return parse_json_strict(raw)
             except Exception as pe:
-                return {"verdict":"unsure","reasons":[f"ผลไม่ใช่ JSON ล้วน: {pe}", raw[:200]],"violations":[],
-                        "confidence":0.0,"meta":{"rule_set_id":"default-v1"}}
+                return {
+                    "verdict":"unsure",
+                    "reasons":[f"ผลไม่ใช่ JSON ล้วน: {pe}", raw[:200]],
+                    "violations":[],
+                    "confidence":0.0,
+                    "meta":{"rule_set_id":"default-v1"}
+                }
         except errors.ServerError as e:
             last_err = e
             if "503" in str(e) and i < retries-1:
-                st.info("🔄 ระบบหนาแน่น กำลังลองใหม่…"); time.sleep(2*(i+1)); continue
+                time.sleep(2*(i+1))
+                continue
             break
         except Exception as e:
-            last_err = e; break
-    return {"verdict":"unsure","reasons":[f"เกิดข้อผิดพลาด: {last_err}"],"violations":[],"confidence":0.0,"meta":{"rule_set_id":"default-v1"}}
+            last_err = e
+            break
+    return {
+        "verdict":"unsure",
+        "reasons":[f"เกิดข้อผิดพลาด: {last_err}"],
+        "violations":[],
+        "confidence":0.0,
+        "meta":{"rule_set_id":"default-v1"}
+    }
 
 # ---------- App state ----------
-if "tab" not in st.session_state: st.session_state.tab = "Home"
-if "history" not in st.session_state: st.session_state.history: List[Dict[str,Any]] = []
+if "tab" not in st.session_state:
+    st.session_state.tab = "Home"
+if "history" not in st.session_state:
+    st.session_state.history: List[Dict[str,Any]] = []
+if "rules_text" not in st.session_state:
+    st.session_state.rules_text = DEFAULT_RULES
 
 # ---------- AppBar ----------
 st.markdown('<div class="appbar"><h1>Pet-style Hair Check</h1></div>', unsafe_allow_html=True)
@@ -187,7 +226,12 @@ def page_check():
         st.info("ℹ️ หากกล้องไม่ขึ้น: ใช้ HTTPS หรือ localhost และอนุญาตสิทธิ์กล้องในเบราว์เซอร์")
         return
 
-    img = Image.open(photo).convert("RGB")
+    try:
+        img = Image.open(photo).convert("RGB")
+    except UnidentifiedImageError:
+        st.error("ไม่สามารถอ่านไฟล์ภาพได้")
+        return
+
     mime = photo.type if photo.type in ("image/png","image/jpeg") else "image/jpeg"
     st.image(img, caption="ภาพที่ถ่าย", use_container_width=True)
 
@@ -195,30 +239,32 @@ def page_check():
     if len(data) > 5*1024*1024:
         img2 = img.copy(); img2.thumbnail((800,800)); data = compress(img2, mime)
 
-    with st.spinner("🤖 กำลังวิเคราะห์…"):
-        res = call_gemini(data, mime)
+    with st.spinner("กำลังวิเคราะห์…"):
+        res = call_gemini(data, mime, st.session_state.rules_text)
 
-    # เก็บประวัติ
+    # เก็บประวัติ (cap 100 รายการ)
     st.session_state.history.insert(0, {"time": time.strftime("%Y-%m-%d %H:%M"), "result": res})
+    if len(st.session_state.history) > 100:
+        st.session_state.history = st.session_state.history[:100]
 
     # แสดงผล
-    v = res.get("verdict","unsure")
+    verdict = res.get("verdict","unsure")
     reasons = res.get("reasons",[]) or []
     violations = res.get("violations",[]) or []
-    conf = res.get("confidence",0.0)
+    conf = float(res.get("confidence",0.0) or 0.0)
 
     st.markdown('<div class="result">', unsafe_allow_html=True)
-    st.markdown(f'<div class="row" style="justify-content:space-between;"><h3>ผลการตรวจ</h3>{badge_view(v)}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="row" style="justify-content:space-between;"><h3>ผลการตรวจ</h3>{badge_view(verdict)}</div>', unsafe_allow_html=True)
     st.markdown(f'<div class="meta">ความมั่นใจ: <b>{conf:.1%}</b></div>', unsafe_allow_html=True)
     if reasons:
         st.markdown('<div style="margin:.6rem 0 .2rem;font-weight:800;">เหตุผล</div>', unsafe_allow_html=True)
         st.markdown('<ul>'+ ''.join(f'<li>{esc(x)}</li>' for x in reasons) +'</ul>', unsafe_allow_html=True)
     if violations:
         st.markdown('<div style="margin:.6rem 0 .2rem;font-weight:800;">จุดที่ไม่ตรงระเบียบ</div>', unsafe_allow_html=True)
-        st.markdown('<ul>'+ ''.join(f'<li>{esc(v.get("message",""))}</li>' for v in violations) +'</ul>', unsafe_allow_html=True)
-    st.download_button("⬇️ ดาวน์โหลดผลลัพธ์ (JSON)", data=json.dumps(res, ensure_ascii=False, indent=2),
+        st.markdown('<ul>'+ ''.join(f'<li>{esc(vio.get("message",""))}</li>' for vio in violations) +'</ul>', unsafe_allow_html=True)
+    st.download_button("ดาวน์โหลดผลลัพธ์ (JSON)", data=json.dumps(res, ensure_ascii=False, indent=2),
                        file_name="haircheck_result.json", mime="application/json", use_container_width=True)
-    st.button("↺ ลบและถ่ายใหม่", type="secondary", use_container_width=True,
+    st.button("ลบและถ่ายใหม่", type="secondary", use_container_width=True,
               on_click=lambda: (st.session_state.update({"tab":"Check"}), st.rerun()))
 
 def page_history():
@@ -228,7 +274,7 @@ def page_history():
         st.info("ยังไม่มีประวัติการตรวจ")
         return
     for i, h in enumerate(st.session_state.history[:12], start=1):
-        r = h["result"]; v = r.get("verdict","unsure"); conf = r.get("confidence",0.0)
+        r = h["result"]; v = r.get("verdict","unsure"); conf = float(r.get("confidence",0.0) or 0.0)
         st.markdown(f"""
         <div class="card" style="margin-bottom:10px;">
           <div class="row" style="justify-content:space-between;">
@@ -241,15 +287,19 @@ def page_history():
 
 def page_settings():
     st.markdown('<div class="card"><b>กฎระเบียบทรงผม</b><div class="meta">ปรับข้อความกฎตามสถานศึกษา</div></div>', unsafe_allow_html=True)
-    st.text_area("RULES (ตัวอย่างค่าเริ่มต้น)", RULES, height=120, key="rules_text")
+    st.text_area("RULES (ตัวอย่างค่าเริ่มต้น)", st.session_state.rules_text, height=120, key="rules_text")
     st.caption("ใส่ GEMINI_API_KEY ใน Secrets หรือ environment เพื่อใช้งานจริง")
 
 # ---------- Router ----------
 tab = st.session_state.tab
-if tab == "Home": page_home()
-elif tab == "Check": page_check()
-elif tab == "History": page_history()
-else: page_settings()
+if tab == "Home":
+    page_home()
+elif tab == "Check":
+    page_check()
+elif tab == "History":
+    page_history()
+else:
+    page_settings()
 
 # ---------- Bottom Nav (SVG icons + in-tab switch) ----------
 # 1) วาดแถบเมนู
@@ -282,37 +332,63 @@ with st.form("nav_form_unique", clear_on_submit=False):
     go_check = c2.form_submit_button(" ", use_container_width=True, key="nav_sub_check")
     go_hist =  c3.form_submit_button(" ", use_container_width=True, key="nav_sub_hist")
     go_set  =  c4.form_submit_button(" ", use_container_width=True, key="nav_sub_settings")
-    # ซ่อนปุ่มจริง
     st.markdown("""
     <style>
       form[data-testid="stForm"] button { opacity:0; height:0; padding:0; margin:0; border:0; }
     </style>
     """, unsafe_allow_html=True)
 
-# 3) JS map ปุ่มเมนู -> ปุ่มในฟอร์ม (อ้าง anchor เพื่อเลือกฟอร์มถูกตัว)
-st.markdown("""
+# 3) JS map ปุ่มเมนู -> ปุ่มในฟอร์ม
+# หมายเหตุ: สภาพแวดล้อมบางแห่งไม่รัน <script> ใน st.markdown
+# จึงให้ fallback ผ่าน components_html (iframe) ที่เรียก parent DOM
+_js = """
 <script>
   (function(){
-    const anchor = document.getElementById('nav-form-anchor');
-    if(!anchor) return;
-    // หา <form> ถัดจาก anchor
-    let f = anchor.nextElementSibling;
-    while(f && f.tagName !== 'FORM'){ f = f.nextElementSibling; }
-    if(!f) return;
-    const btns = f.querySelectorAll('button');
-
-    const ids = ["nav-home","nav-check","nav-history","nav-settings"];
-    ids.forEach((id, idx) => {
-      const el = document.getElementById(id);
-      if(!el) return;
-      el.addEventListener('click', function(ev){
-        ev.preventDefault();
-        if(btns[idx]) btns[idx].click();
+    try{
+      const f = document.querySelector('form[data-testid="stForm"]');
+      if(!f) return;
+      const btns = f.querySelectorAll('button');
+      const ids = ["nav-home","nav-check","nav-history","nav-settings"];
+      ids.forEach((id, idx) => {
+        const el = document.getElementById(id);
+        if(!el) return;
+        el.addEventListener('click', function(ev){
+          ev.preventDefault();
+          if(btns[idx]) btns[idx].click();
+        });
       });
-    });
+    }catch(e){}
   })();
 </script>
-""", unsafe_allow_html=True)
+"""
+# พยายามฉีดผ่าน markdown ก่อน (เงียบ ๆ หากถูกบล็อก)
+st.markdown(_js, unsafe_allow_html=True)
+
+# Fallback ที่แน่นอนผ่าน components (iframe) เรียก parent.document
+components_html(f"""
+<!doctype html><html><body></body>
+<script>
+try{{
+  const pdoc = window.parent && window.parent.document;
+  if(!pdoc) throw new Error("no parent");
+  const f = pdoc.querySelector('form[data-testid="stForm"]');
+  if(!f) throw new Error("no form");
+  const btns = f.querySelectorAll('button');
+  const map = {{
+    "nav-home":0, "nav-check":1, "nav-history":2, "nav-settings":3
+  }};
+  Object.keys(map).forEach(id => {{
+    const el = pdoc.getElementById(id);
+    if(!el) return;
+    el.addEventListener('click', function(ev){{
+      ev.preventDefault();
+      const idx = map[id];
+      if(btns[idx]) btns[idx].click();
+    }});
+  }});
+}}catch(e){{ /* swallow */ }}
+</script>
+""", height=0)
 
 # 4) อ่านผลกดจากปุ่มซ่อน แล้วสลับหน้าในแท็บเดิม
 if go_home:
