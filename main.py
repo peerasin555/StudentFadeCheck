@@ -67,12 +67,20 @@ a{color:inherit; text-decoration:none}
 .result{background:var(--card); border:1px solid var(--br); border-radius:16px; padding:14px; box-shadow:0 2px 12px rgba(0,0,0,.05)}
 .result h3{margin:.2rem 0 .3rem 0}
 
-/* Bottom nav (links with query parameters) */
-.nav{position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--br);
-  display:flex; justify-content:space-around; padding:10px 8px; z-index:10}
-.nav a{display:flex; flex-direction:column; align-items:center; gap:4px; font-size:12px; color:#0f172a}
-.nav .active{color:#4f46e5; font-weight:900}
-.nav .icon{font-size:18px}
+/* --- Bottom nav (icon only) --- */
+.nav{
+  position:fixed; left:0; right:0; bottom:0;
+  background:#fff; border-top:1px solid #e5e7eb;
+  display:flex; justify-content:space-around; padding:10px 8px; z-index:10
+}
+.nav a{
+  display:flex; flex-direction:column; align-items:center; gap:6px;
+  font-size:11px; color:#0f172a; text-decoration:none
+}
+.nav a .icon{ width:24px; height:24px; display:block; }
+.nav a .icon svg{ width:24px; height:24px; stroke:#0f172a; stroke-width:2; fill:none; }
+.nav a.active .icon svg{ stroke:#4f46e5; }
+.nav a.active{ color:#4f46e5; font-weight:900; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -159,17 +167,69 @@ qp = st.query_params  # Streamlit >=1.30
 tab = qp.get("tab", "Home")
 
 def nav_bar(active: str):
-    def link(name: str, icon: str):
-        href = f"?tab={name}"
+    # SVG ไอคอนแบบ inline (ไม่พึ่ง CDN)
+    ICONS = {
+        "Home": """
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 10.5 12 3l9 7.5" />
+              <path d="M5 10v10h14V10" />
+            </svg>
+        """,
+        "Check": """
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <rect x="3" y="3" width="18" height="18" rx="4" />
+              <path d="M8 12h8M12 8v8" />
+            </svg>
+        """,
+        "History": """
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 13a9 9 0 1 0 3-7.4l-3 3.4" />
+              <path d="M3 3v6h6" />
+              <path d="M12 7v5l3 3" />
+            </svg>
+        """,
+        "Settings": """
+            <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+              <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.03.03a2 2 0 1 1-2.83 2.83l-.03-.03A1.8 1.8 0 0 0 15 19.4a1.8 1.8 0 0 0-1 .31 1.8 1.8 0 0 0-.9 1.56v.06a2 2 0 1 1-4 0v-.06A1.8 1.8 0 0 0 7 19.4a1.8 1.8 0 0 0-1.96-.36l-.03.03a2 2 0 1 1-2.83-2.83l.03-.03A1.8 1.8 0 0 0 4.6 15 1.8 1.8 0 0 0 4.29 14a1.8 1.8 0 0 0-1.56-.9H2.67a2 2 0 1 1 0-4h.06A1.8 1.8 0 0 0 4.29 8a1.8 1.8 0 0 0 .31-1 1.8 1.8 0 0 0-.36-1.96l-.03-.03A2 2 0 1 1 7.04 1.18l.03.03A1.8 1.8 0 0 0 8 4.6c.3 0 .68-.1 1-.31.3-.2.7-.29 1.06-.3h.06a2 2 0 1 1 4 0h.06c.36.01.76.1 1.06.3.32.21.7.31 1 .31A1.8 1.8 0 0 0 19.4 5l.03-.03a2 2 0 1 1 2.83 2.83L22.2 7.83A1.8 1.8 0 0 0 19.4 9c0 .3.1.68.31 1 .2.3.29.7.3 1.06v.06Z" />
+            </svg>
+        """,
+    }
+
+    def item(name: str) -> str:
         cls = "active" if active == name else ""
-        return f'<a class="{cls}" href="{href}"><span class="icon">{icon}</span>{name}</a>'
+        return f'''
+          <a href="#" class="{cls}" data-tab="{name}">
+            <span class="icon">{ICONS[name]}</span>
+            <span>{name}</span>
+          </a>
+        '''
+
     st.markdown(f"""
-    <div class="nav">
-      {link("Home","🏠")}
-      {link("Check","🐾")}
-      {link("History","🗂️")}
-      {link("Settings","⚙️")}
+    <div class="nav" id="bottom-nav">
+      {item("Home")}
+      {item("Check")}
+      {item("History")}
+      {item("Settings")}
     </div>
+    <script>
+      // จับคลิก -> เปลี่ยน query param tab แบบ in-place (ไม่เปิดแท็บใหม่)
+      (function() {{
+        const nav = document.getElementById('bottom-nav');
+        if (!nav) return;
+        nav.querySelectorAll('a[data-tab]').forEach(a => {{
+          a.addEventListener('click', (ev) => {{
+            ev.preventDefault();
+            const tab = a.getAttribute('data-tab');
+            const url = new URL(window.location.href);
+            url.searchParams.set('tab', tab);
+            // เปลี่ยน URL โดยไม่เปิดแท็บใหม่ แล้ว reload เพื่อให้ Python วาดหน้าใหม่
+            window.history.replaceState(null, '', url.toString());
+            window.location.reload();
+          }});
+        }});
+      }})();
+    </script>
     """, unsafe_allow_html=True)
 
 # ---------- AppBar ----------
@@ -259,3 +319,4 @@ else: page_settings()
 
 # ---------- Bottom Nav ----------
 nav_bar(tab)
+
