@@ -1,4 +1,4 @@
-# app.py — Mobile-first UI with bottom nav (URL-driven), no JS required
+# app.py — Mobile-first UI with bottom nav (URL-driven, same-tab), no JS/forms
 import os, io, json, html, time
 from typing import Any, Dict, List, Optional
 from PIL import Image, UnidentifiedImageError
@@ -108,21 +108,24 @@ SCHEMA_HINT = (
     '"meta":{"rule_set_id":"default-v1","timestamp":"AUTO"}}'
 )
 
-# ---------- URL State Helpers (support old/new Streamlit) ----------
-def _get_query_params() -> Dict[str, List[str] | str]:
-    # New API
+# ---------- URL helpers (same-tab navigation via query params) ----------
+def _get_qp() -> Dict[str, str]:
     if hasattr(st, "query_params"):
+        # Streamlit ใหม่: behaves like dict[str, str]
         return dict(st.query_params)
-    # Legacy API
-    return st.experimental_get_query_params()  # type: ignore[attr-defined]
+    return {k: v[0] for k, v in st.experimental_get_query_params().items()}  # type: ignore
 
-def _set_query_params(**kwargs):
+def _set_qp(**kwargs):
     if hasattr(st, "query_params"):
         st.query_params.clear()
         for k, v in kwargs.items():
             st.query_params[k] = v
     else:
-        st.experimental_set_query_params(**kwargs)  # type: ignore[attr-defined]
+        st.experimental_set_query_params(**kwargs)  # type: ignore
+
+def goto(tab: str):
+    st.session_state.tab = tab
+    _set_qp(tab=tab)  # reloads in the SAME tab (no new window)
 
 # ---------- Utils ----------
 def esc(x: Any) -> str:
@@ -207,7 +210,7 @@ USER (ไทย):
             last_err = e; break
     return {"verdict":"unsure","reasons":[f"เกิดข้อผิดพลาด: {last_err}"],"violations":[],"confidence":0.0,"meta":{"rule_set_id":"default-v1"}}
 
-# ---------- URL-driven tab state ----------
+# ---------- App state ----------
 if "tab" not in st.session_state:
     st.session_state.tab = "Home"
 if "history" not in st.session_state:
@@ -215,16 +218,10 @@ if "history" not in st.session_state:
 if "rules_text" not in st.session_state:
     st.session_state.rules_text = DEFAULT_RULES
 
-# pull tab from URL if present
-_qp = _get_query_params()
+# sync from URL (same tab, no popup)
+_qp = _get_qp()
 if "tab" in _qp and _qp["tab"]:
-    # _qp["tab"] may be list in legacy API
-    tab_from_url = _qp["tab"][0] if isinstance(_qp["tab"], list) else _qp["tab"]
-    st.session_state.tab = tab_from_url
-
-def goto(tab: str):
-    st.session_state.tab = tab
-    _set_query_params(tab=tab)
+    st.session_state.tab = _qp["tab"]
 
 # ---------- AppBar ----------
 st.markdown('<div class="appbar"><h1>Pet-style Hair Check</h1></div>', unsafe_allow_html=True)
@@ -328,7 +325,7 @@ elif tab == "History":
 else:
     page_settings()
 
-# ---------- Bottom Nav (anchor links drive URL -> state) ----------
+# ---------- Bottom Nav (same-tab via query params; never opens a new tab) ----------
 current = st.session_state.tab
 st.markdown(f"""
 <div class="nav" id="navbar">
@@ -345,7 +342,7 @@ st.markdown(f"""
     History
   </a>
   <a href="?tab=Settings" class="{ 'active' if current=='Settings' else '' }" aria-label="Settings">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 15.5a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5Zm7.94-1.5.9 1.56-2.06 3.56-1.8-.66a8.82 8.82 0 0 1-1.56.9l-.27 1.91H8.85l-.27-1.91a8.82 8.82 0 0 1-1.56-.9l-1.8.66L3.16 15.6l.9-1.56a8.82 8.82 0 0 1 0 1.56L3.16 10.9l2.06-3.56 1.8.66a8.82 8.82 0 0 1 1.56-.9l.27-1.91h4.34l.27 1.91a8.82 8.82 0 0 1 1.56.9l1.8-.66 2.06 3.56-.9 1.8a8.82 8.82 0 0 1 0 1.56Z" stroke-width="1.2"/></svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 15.5a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5Zm7.94-1.5.9 1.56-2.06 3.56-1.8-.66a8.82 8.82 0 0 1-1.56.9l-.27 1.91H8.85l-.27-1.91a8.82 8.82 0 0 1-1.56-.9l-1.8.66L3.16 15.6l.9-1.56a8.82 8.82 0 0 1 0 1.56L3.16 10.9l2.06-3.56 1.8.66a8.82 8.82 0 0 1 1.56.9l1.8-.66 2.06 3.56-.9 1.8a8.82 8.82 0 0 1 0 1.56Z" stroke-width="1.2"/></svg>
     Settings
   </a>
 </div>
