@@ -255,31 +255,20 @@ svg_check = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d=
 svg_hist = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 5h18M3 12h18M3 19h18" stroke-width="1.7"/></svg>'
 svg_sett = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 15.5a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5Zm7.94-1.5.9 1.56-2.06 3.56-1.8-.66a8.82 8.82 0 0 1-1.56.9l-.27 1.91H8.85l-.27-1.91a8.82 8.82 0 0 1-1.56-.9l-1.8.66L3.16 15.6l.9-1.56a8.82 8.82 0 0 1 0-1.56L3.16 10.9l2.06-3.56 1.8.66a8.82 8.82 0 0 1 1.56-.9l.27-1.91h4.34l.27 1.91a8.82 8.82 0 0 1 1.56.9l1.8-.66 2.06 3.56-.9 1.8a8.82 8.82 0 0 1 0 1.56Z" stroke-width="1.2"/></svg>'
 
-st.markdown(f"""
-<div class="nav" id="nav">
-  {nav_item("Home", svg_home)}
-  {nav_item("Check", svg_check)}
-  {nav_item("History", svg_hist)}
-  {nav_item("Settings", svg_sett)}
-</div>
+st.markdown("""
 <script>
-  (function(){
-    const nav = document.getElementById('nav');
-    if(!nav) return;
+  const nav = document.getElementById('nav');
+  if(nav){
     nav.querySelectorAll('a[data-tab]').forEach(a=>{
       a.addEventListener('click', function(e){
-        e.preventDefault(); e.stopPropagation();
+        e.preventDefault();
         const tab = this.getAttribute('data-tab');
         if(!tab) return;
-        // ใช้ History API เพื่ออยู่แท็บเดิมเสมอ
         const url = new URL(window.location.href);
         url.searchParams.set('tab', tab);
-        window.location.assign(url.toString()); // same-tab navigation
-      }, {passive:false});
+        window.location.assign(url.toString());
+      });
     });
-  })();
+  }
 </script>
 """, unsafe_allow_html=True)
-
-
-
