@@ -80,34 +80,17 @@ a{color:inherit; text-decoration:none}
 .result{background:var(--card); border:1px solid var(--br); border-radius:16px; padding:14px; box-shadow:0 2px 12px rgba(0,0,0,.05)}
 .result h3{margin:.2rem 0 .3rem 0}
 
-/* Bottom nav */
+/* Bottom nav (pure anchors; no JS/forms) */
 .nav{
   position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--br);
   display:flex; justify-content:space-around; padding:8px 4px; z-index:10
 }
 .nav a{
-  background:none; border:none; padding:6px 10px; display:flex; flex-direction:column; align-items:center;
-  gap:2px; color:#0f172a; font-size:12px; border-radius:10px; text-decoration:none;
+  padding:6px 10px; display:flex; flex-direction:column; align-items:center;
+  gap:2px; color:#0f172a; font-size:12px; border-radius:10px;
 }
 .nav a.active{ color:var(--active); font-weight:900; background:rgba(79,70,229,.08); }
 .nav svg{width:22px; height:22px; display:block}
-
-/* Nav button styling */
-.nav-btn-container button {
-    background: none !important;
-    border: none !important;
-    padding: 6px 10px !important;
-    color: #0f172a !important;
-    font-size: 12px !important;
-    box-shadow: none !important;
-    font-weight: 600 !important;
-    border-radius: 10px !important;
-}
-.nav-btn-container.active button {
-    color: var(--active) !important;
-    font-weight: 900 !important;
-    background: rgba(79,70,229,.08) !important;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -128,7 +111,6 @@ SCHEMA_HINT = (
 # ---------- URL helpers (same-tab navigation via query params) ----------
 def _get_qp() -> Dict[str, str]:
     if hasattr(st, "query_params"):
-        # Streamlit ใหม่: behaves like dict[str, str]
         return dict(st.query_params)
     return {k: v[0] for k, v in st.experimental_get_query_params().items()}  # type: ignore
 
@@ -143,7 +125,7 @@ def _set_qp(**kwargs):
 def goto(tab: str):
     st.session_state.tab = tab
     _set_qp(tab=tab)
-    st.rerun()  # Force reload to apply changes
+    st.rerun()
 
 # ---------- Utils ----------
 def esc(x: Any) -> str:
@@ -245,9 +227,11 @@ st.markdown('<div class="appbar"><h1>Pet-style Hair Check</h1></div>', unsafe_al
 
 # ---------- Pages ----------
 def page_home():
-    st.markdown('<a class="bigbtn" href="#" onclick="return false;">🧑‍🎓 ตรวจทรงผมของนักเรียน<small>เปิดกล้องและวิเคราะห์อัตโนมัติ</small></a>', unsafe_allow_html=True)
+    # Use pure links for same-tab navigation (no JS/forms)
+    st.markdown('<a class="bigbtn" href="?tab=Check">🧑‍🎓 ตรวจทรงผมของนักเรียน<small>เปิดกล้องและวิเคราะห์อัตโนมัติ</small></a>', unsafe_allow_html=True)
     st.markdown("")
-    st.markdown('<a class="bigbtn" href="#" onclick="return false;">🗂️ ดูประวัติการตรวจ<small>ผลล่าสุดและรายละเอียด</small></a>', unsafe_allow_html=True)
+    st.markdown('<a class="bigbtn" href="?tab=History">🗂️ ดูประวัติการตรวจ<small>ผลล่าสุดและรายละเอียด</small></a>', unsafe_allow_html=True)
+
     c1, c2 = st.columns(2)
     with c1:
         if st.button("เริ่มตรวจตอนนี้", use_container_width=True, key="cta_start"):
@@ -329,12 +313,10 @@ def page_history():
 
 def page_settings():
     st.markdown('<div class="card"><b>กฎระเบียบทรงผม</b><div class="meta">ปรับข้อความกฎตามสถานศึกษา</div></div>', unsafe_allow_html=True)
-    
-    new_rules = st.text_area("RULES (ตัวอย่างค่าเริ่มต้น)", 
-                              value=st.session_state.rules_text, 
-                              height=120, 
-                              key="rules_text_input")
-    
+    new_rules = st.text_area("RULES (ตัวอย่างค่าเริ่มต้น)",
+                             value=st.session_state.rules_text,
+                             height=120,
+                             key="rules_text_input")
     col1, col2 = st.columns(2)
     with col1:
         if st.button("บันทึก", use_container_width=True, type="primary"):
@@ -344,10 +326,9 @@ def page_settings():
         if st.button("รีเซ็ต", use_container_width=True):
             st.session_state.rules_text = DEFAULT_RULES
             st.rerun()
-    
+
     st.caption("💡 ใส่ GEMINI_API_KEY ใน Secrets หรือ environment เพื่อใช้งานจริง")
-    
-    # แสดงสถานะ API
+
     client = get_gemini_client()
     if client:
         st.success("🔑 API Key: พร้อมใช้งาน")
@@ -365,38 +346,27 @@ elif tab == "History":
 else:
     page_settings()
 
-# ---------- Bottom Nav (same-tab navigation with buttons styled as links) ----------
+# ---------- Bottom Nav (pure HTML anchors; URL-driven, same-tab) ----------
 current = st.session_state.tab
+def _active(t): return "active" if current == t else ""
 
-st.markdown('<div class="nav" id="navbar">', unsafe_allow_html=True)
-
-# Home
-st.markdown(f'<div class="nav-btn-container {"active" if current=="Home" else ""}">', unsafe_allow_html=True)
-cols = st.columns([1,1,1,1])
-with cols[0]:
-    st.markdown('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:22px;height:22px;margin:0 auto;display:block"><path d="M3 9.5 12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V9.5z" stroke-width="1.7"/></svg>', unsafe_allow_html=True)
-    if st.button("Home", key="nav_home", use_container_width=True):
-        goto("Home")
-
-# Check
-with cols[1]:
-    st.markdown(f'</div><div class="nav-btn-container {"active" if current=="Check" else ""}">', unsafe_allow_html=True)
-    st.markdown('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:22px;height:22px;margin:0 auto;display:block"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.33 0-8 2.17-8 5v1h16v-1c0-2.83-3.67-5-8-5Z" stroke-width="1.7"/></svg>', unsafe_allow_html=True)
-    if st.button("Check", key="nav_check", use_container_width=True):
-        goto("Check")
-
-# History
-with cols[2]:
-    st.markdown(f'</div><div class="nav-btn-container {"active" if current=="History" else ""}">', unsafe_allow_html=True)
-    st.markdown('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:22px;height:22px;margin:0 auto;display:block"><path d="M3 5h18M3 12h18M3 19h18" stroke-width="1.7"/></svg>', unsafe_allow_html=True)
-    if st.button("History", key="nav_history", use_container_width=True):
-        goto("History")
-
-# Settings
-with cols[3]:
-    st.markdown(f'</div><div class="nav-btn-container {"active" if current=="Settings" else ""}">', unsafe_allow_html=True)
-    st.markdown('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:22px;height:22px;margin:0 auto;display:block"><path d="M12 15.5a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5Zm7.94-1.5.9 1.56-2.06 3.56-1.8-.66a8.82 8.82 0 0 1-1.56.9l-.27 1.91H8.85l-.27-1.91a8.82 8.82 0 0 1-1.56-.9l-1.8.66L3.16 15.6l.9-1.56a8.82 8.82 0 0 1 0 1.56L3.16 10.9l2.06-3.56 1.8.66a8.82 8.82 0 0 1 1.56.9l1.8-.66 2.06 3.56-.9 1.8a8.82 8.82 0 0 1 0 1.56Z" stroke-width="1.2"/></svg>', unsafe_allow_html=True)
-    if st.button("Settings", key="nav_settings", use_container_width=True):
-        goto("Settings")
-
-st.markdown('</div></div>', unsafe_allow_html=True)
+st.markdown(f'''
+<div class="nav" id="navbar">
+  <a class="{_active("Home")}" href="?tab=Home" aria-label="Home">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9.5 12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V9.5z" stroke-width="1.7"/></svg>
+    <span>Home</span>
+  </a>
+  <a class="{_active("Check")}" href="?tab=Check" aria-label="Check">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.33 0-8 2.17-8 5v1h16v-1c0-2.83-3.67-5-8-5Z" stroke-width="1.7"/></svg>
+    <span>Check</span>
+  </a>
+  <a class="{_active("History")}" href="?tab=History" aria-label="History">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 5h18M3 12h18M3 19h18" stroke-width="1.7"/></svg>
+    <span>History</span>
+  </a>
+  <a class="{_active("Settings")}" href="?tab=Settings" aria-label="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 15.5a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5Zm7.94-1.5.9 1.56-2.06 3.56-1.8-.66a8.82 8.82 0 0 1-1.56.9l-.27 1.91H8.85l-.27-1.91a8.82 8.82 0 0 1-1.56-.9l-1.8.66L3.16 15.6l.9-1.56a8.82 8.82 0 0 1 0 1.56L3.16 10.9l2.06-3.56 1.8.66a8.82 8.82 0 0 1 1.56.9l1.8-.66 2.06 3.56-.9 1.8a8.82 8.82 0 0 1 0 1.56Z" stroke-width="1.2"/></svg>
+    <span>Settings</span>
+  </a>
+</div>
+''', unsafe_allow_html=True)
