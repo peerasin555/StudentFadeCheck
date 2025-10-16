@@ -1,4 +1,4 @@
-# app.py — Mobile-first UI, bottom nav with SVG icons, in-tab page switch
+# app.py — Mobile-first UI, bottom nav with SVG icons, in-tab page switch (FIXED KEYS)
 import os, io, json, html, time
 from typing import Any, Dict, List
 from PIL import Image
@@ -170,17 +170,17 @@ def page_home():
     st.markdown('<a class="bigbtn" href="#" onclick="return false;">🗂️ ดูประวัติการตรวจ<small>ผลล่าสุดและรายละเอียด</small></a>', unsafe_allow_html=True)
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("เริ่มตรวจตอนนี้", use_container_width=True, key="cta1"):
+        if st.button("เริ่มตรวจตอนนี้", use_container_width=True, key="cta_start"):
             st.session_state.tab = "Check"; st.rerun()
     with c2:
-        if st.button("เปิดดูประวัติ", use_container_width=True, key="cta2"):
+        if st.button("เปิดดูประวัติ", use_container_width=True, key="cta_hist"):
             st.session_state.tab = "History"; st.rerun()
 
 def page_check():
-    st.text_input("ค้นหาสถานที่/ห้องเรียน (ตัวอย่าง UI เท่านั้น)", placeholder="เช่น อาคาร A ห้อง 201")
+    st.text_input("ค้นหาสถานที่/ห้องเรียน (ตัวอย่าง UI เท่านั้น)", placeholder="เช่น อาคาร A ห้อง 201", key="search_room")
     st.markdown('<div class="chips">'+ ''.join(f'<span class="chip">{x}</span>' for x in ["แสงเพียงพอ","เห็นหู","ไม่ย้อนแสง","ถือให้มั่นคง"]) +'</div>', unsafe_allow_html=True)
 
-    photo = st.camera_input("ถ่ายภาพทรงผม")
+    photo = st.camera_input("ถ่ายภาพทรงผม", key="cam_input")
     st.markdown('<div class="overlay"><span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span></div>', unsafe_allow_html=True)
 
     if photo is None:
@@ -252,61 +252,69 @@ elif tab == "History": page_history()
 else: page_settings()
 
 # ---------- Bottom Nav (SVG icons + in-tab switch) ----------
-# ใช้ st.form + hidden buttons เพื่อ trigger rerun แบบไม่มี "ปุ่มล่องหน"
-with st.container():
-    st.markdown("""
-    <div class="nav" id="navbar">
-      <button id="nav-home"   class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9.5 12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V9.5z" stroke-width="1.7"/></svg>Home</button>
-      <button id="nav-check"  class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.33 0-8 2.17-8 5v1h16v-1c0-2.83-3.67-5-8-5Z" stroke-width="1.7"/></svg>Check</button>
-      <button id="nav-history"class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 5h18M3 12h18M3 19h18" stroke-width="1.7"/></svg>History</button>
-      <button id="nav-settings"class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 15.5a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5Zm7.94-1.5.9 1.56-2.06 3.56-1.8-.66a8.82 8.82 0 0 1-1.56.9l-.27 1.91H8.85l-.27-1.91a8.82 8.82 0 0 1-1.56-.9l-1.8.66L3.16 15.6l.9-1.56a8.82 8.82 0 0 1 0-1.56L3.16 10.9l2.06-3.56 1.8.66a8.82 8.82 0 0 1 1.56-.9l.27-1.91h4.34l.27 1.91a8.82 8.82 0 0 1 1.56.9l1.8-.66 2.06 3.56-.9 1.8a8.82 8.82 0 0 1 0 1.56Z" stroke-width="1.2"/></svg>Settings</button>
-    </div>
-    <script>
-      const current = %s;
-      const map = {"Home":"nav-home","Check":"nav-check","History":"nav-history","Settings":"nav-settings"};
-      // set active class
-      Object.entries(map).forEach(([k,id])=>{
-        const el = document.getElementById(id);
-        if(!el) return;
-        if(k===current){ el.classList.add('active'); } else { el.classList.remove('active'); }
-      });
-    </script>
-    """ % (json.dumps(tab)), unsafe_allow_html=True)
+# 1) วาดแถบเมนู
+st.markdown(f"""
+<div class="nav" id="navbar">
+  <button id="nav-home"    class="{ 'active' if tab=='Home'    else '' }" aria-label="Home">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9.5 12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V9.5z" stroke-width="1.7"/></svg>
+    Home
+  </button>
+  <button id="nav-check"   class="{ 'active' if tab=='Check'   else '' }" aria-label="Check">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.33 0-8 2.17-8 5v1h16v-1c0-2.83-3.67-5-8-5Z" stroke-width="1.7"/></svg>
+    Check
+  </button>
+  <button id="nav-history" class="{ 'active' if tab=='History' else '' }" aria-label="History">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 5h18M3 12h18M3 19h18" stroke-width="1.7"/></svg>
+    History
+  </button>
+  <button id="nav-settings" class="{ 'active' if tab=='Settings' else '' }" aria-label="Settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 15.5a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5Zm7.94-1.5.9 1.56-2.06 3.56-1.8-.66a8.82 8.82 0 0 1-1.56.9l-.27 1.91H8.85l-.27-1.91a8.82 8.82 0 0 1-1.56-.9l-1.8.66L3.16 15.6l.9-1.56a8.82 8.82 0 0 1 0-1.56L3.16 10.9l2.06-3.56 1.8.66a8.82 8.82 0 0 1 1.56-.9l.27-1.91h4.34l.27 1.91a8.82 8.82 0 0 1 1.56.9l1.8-.66 2.06 3.56-.9 1.8a8.82 8.82 0 0 1 0 1.56Z" stroke-width="1.2"/></svg>
+    Settings
+  </button>
+</div>
+<div id="nav-form-anchor"></div>
+""", unsafe_allow_html=True)
 
-# ปุ่มควบคุมที่ซ่อน (ใช้ค่า key แตกต่างเพื่อไม่ทับ)
-with st.form("nav_form", clear_on_submit=False):
+# 2) ฟอร์มซ่อน + ปุ่มมี key ไม่ซ้ำ (แก้ DuplicateElementKey)
+with st.form("nav_form_unique", clear_on_submit=False):
     c1, c2, c3, c4 = st.columns(4)
-    go_home   = c1.form_submit_button(" ", use_container_width=True)
-    go_check  = c2.form_submit_button(" ", use_container_width=True)
-    go_hist   = c3.form_submit_button(" ", use_container_width=True)
-    go_set    = c4.form_submit_button(" ", use_container_width=True)
-    # ทำให้ปุ่มมองไม่เห็น (แต่ยังอยู่เพื่อให้ JS click ได้)
+    go_home =  c1.form_submit_button(" ", use_container_width=True, key="nav_sub_home")
+    go_check = c2.form_submit_button(" ", use_container_width=True, key="nav_sub_check")
+    go_hist =  c3.form_submit_button(" ", use_container_width=True, key="nav_sub_hist")
+    go_set  =  c4.form_submit_button(" ", use_container_width=True, key="nav_sub_settings")
+    # ซ่อนปุ่มจริง
     st.markdown("""
     <style>
       form[data-testid="stForm"] button { opacity:0; height:0; padding:0; margin:0; border:0; }
     </style>
     """, unsafe_allow_html=True)
 
+# 3) JS map ปุ่มเมนู -> ปุ่มในฟอร์ม (อ้าง anchor เพื่อเลือกฟอร์มถูกตัว)
 st.markdown("""
 <script>
-  const f = window.parent.document.querySelector('form[data-testid="stForm"]');
-  if (f){
+  (function(){
+    const anchor = document.getElementById('nav-form-anchor');
+    if(!anchor) return;
+    // หา <form> ถัดจาก anchor
+    let f = anchor.nextElementSibling;
+    while(f && f.tagName !== 'FORM'){ f = f.nextElementSibling; }
+    if(!f) return;
     const btns = f.querySelectorAll('button');
+
     const ids = ["nav-home","nav-check","nav-history","nav-settings"];
-    ids.forEach((id, i)=>{
-      const target = document.getElementById(id);
-      if(!target) return;
-      target.addEventListener('click', (e)=>{
-        e.preventDefault();
-        // trigger i-th hidden submit button to rerun Streamlit
-        btns[i].click();
+    ids.forEach((id, idx) => {
+      const el = document.getElementById(id);
+      if(!el) return;
+      el.addEventListener('click', function(ev){
+        ev.preventDefault();
+        if(btns[idx]) btns[idx].click();
       });
     });
-  }
+  })();
 </script>
 """, unsafe_allow_html=True)
 
-# อ่านผลการคลิกจากปุ่มที่ซ่อน
+# 4) อ่านผลกดจากปุ่มซ่อน แล้วสลับหน้าในแท็บเดิม
 if go_home:
     st.session_state.tab = "Home"; st.rerun()
 elif go_check:
