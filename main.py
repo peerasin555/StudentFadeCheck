@@ -91,6 +91,23 @@ a{color:inherit; text-decoration:none}
 }
 .nav a.active{ color:var(--active); font-weight:900; background:rgba(79,70,229,.08); }
 .nav svg{width:22px; height:22px; display:block}
+
+/* Nav button styling */
+.nav-btn-container button {
+    background: none !important;
+    border: none !important;
+    padding: 6px 10px !important;
+    color: #0f172a !important;
+    font-size: 12px !important;
+    box-shadow: none !important;
+    font-weight: 600 !important;
+    border-radius: 10px !important;
+}
+.nav-btn-container.active button {
+    color: var(--active) !important;
+    font-weight: 900 !important;
+    background: rgba(79,70,229,.08) !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -125,7 +142,8 @@ def _set_qp(**kwargs):
 
 def goto(tab: str):
     st.session_state.tab = tab
-    _set_qp(tab=tab)  # reloads in the SAME tab (no new window)
+    _set_qp(tab=tab)
+    st.rerun()  # Force reload to apply changes
 
 # ---------- Utils ----------
 def esc(x: Any) -> str:
@@ -176,9 +194,8 @@ def call_gemini(image_bytes: bytes, mime: str, rules_text: str, retries: int = 2
     if not client:
         return {"verdict":"unsure","reasons":["ยังไม่ได้ตั้งค่า GEMINI_API_KEY"],"violations":[],"confidence":0.0,"meta":{"rule_set_id":"default-v1"}}
 
-    prompt = f"""SYSTEM:
-คุณเป็นผู้ช่วยตรวจทรงผมนักเรียน ให้ตอบเป็น JSON เท่านั้น
-USER (ไทย):
+    prompt = f"""คุณเป็นผู้ช่วยตรวจทรงผมนักเรียน ให้ตอบเป็น JSON เท่านั้น
+
 ตรวจรูปนี้ตามกฎ:
 {rules_text}
 
@@ -285,11 +302,12 @@ def page_check():
     if violations:
         st.markdown('<div style="margin:.6rem 0 .2rem;font-weight:800;">จุดที่ไม่ตรงระเบียบ</div>', unsafe_allow_html=True)
         st.markdown('<ul>'+ ''.join(f'<li>{esc(v.get("message",""))}</li>' for v in violations) +'</ul>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     st.download_button("ดาวน์โหลดผลลัพธ์ (JSON)", data=json.dumps(res, ensure_ascii=False, indent=2),
                        file_name="haircheck_result.json", mime="application/json", use_container_width=True)
-    st.button("ลบและถ่ายใหม่", type="secondary", use_container_width=True,
-              on_click=lambda: goto("Check"))
+    if st.button("ลบและถ่ายใหม่", type="secondary", use_container_width=True):
+        goto("Check")
 
 def page_history():
     st.markdown('<div class="card"><div class="row"><div class="avatar"></div><div><b>Top rated</b><div class="meta">ผลที่เชื่อถือได้มากสุดล่าสุด</div></div></div></div>', unsafe_allow_html=True)
@@ -311,8 +329,30 @@ def page_history():
 
 def page_settings():
     st.markdown('<div class="card"><b>กฎระเบียบทรงผม</b><div class="meta">ปรับข้อความกฎตามสถานศึกษา</div></div>', unsafe_allow_html=True)
-    st.text_area("RULES (ตัวอย่างค่าเริ่มต้น)", st.session_state.rules_text, height=120, key="rules_text")
-    st.caption("ใส่ GEMINI_API_KEY ใน Secrets หรือ environment เพื่อใช้งานจริง")
+    
+    new_rules = st.text_area("RULES (ตัวอย่างค่าเริ่มต้น)", 
+                              value=st.session_state.rules_text, 
+                              height=120, 
+                              key="rules_text_input")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("บันทึก", use_container_width=True, type="primary"):
+            st.session_state.rules_text = new_rules
+            st.success("✅ บันทึกสำเร็จ!")
+    with col2:
+        if st.button("รีเซ็ต", use_container_width=True):
+            st.session_state.rules_text = DEFAULT_RULES
+            st.rerun()
+    
+    st.caption("💡 ใส่ GEMINI_API_KEY ใน Secrets หรือ environment เพื่อใช้งานจริง")
+    
+    # แสดงสถานะ API
+    client = get_gemini_client()
+    if client:
+        st.success("🔑 API Key: พร้อมใช้งาน")
+    else:
+        st.warning("⚠️ ยังไม่ได้ตั้งค่า API Key")
 
 # ---------- Router ----------
 tab = st.session_state.tab
@@ -325,25 +365,38 @@ elif tab == "History":
 else:
     page_settings()
 
-# ---------- Bottom Nav (same-tab via query params; never opens a new tab) ----------
+# ---------- Bottom Nav (same-tab navigation with buttons styled as links) ----------
 current = st.session_state.tab
-st.markdown(f"""
-<div class="nav" id="navbar">
-  <a href="?tab=Home" class="{ 'active' if current=='Home'    else '' }" aria-label="Home">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9.5 12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V9.5z" stroke-width="1.7"/></svg>
-    Home
-  </a>
-  <a href="?tab=Check" class="{ 'active' if current=='Check'   else '' }" aria-label="Check">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.33 0-8 2.17-8 5v1h16v-1c0-2.83-3.67-5-8-5Z" stroke-width="1.7"/></svg>
-    Check
-  </a>
-  <a href="?tab=History" class="{ 'active' if current=='History' else '' }" aria-label="History">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 5h18M3 12h18M3 19h18" stroke-width="1.7"/></svg>
-    History
-  </a>
-  <a href="?tab=Settings" class="{ 'active' if current=='Settings' else '' }" aria-label="Settings">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 15.5a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5Zm7.94-1.5.9 1.56-2.06 3.56-1.8-.66a8.82 8.82 0 0 1-1.56.9l-.27 1.91H8.85l-.27-1.91a8.82 8.82 0 0 1-1.56-.9l-1.8.66L3.16 15.6l.9-1.56a8.82 8.82 0 0 1 0 1.56L3.16 10.9l2.06-3.56 1.8.66a8.82 8.82 0 0 1 1.56.9l1.8-.66 2.06 3.56-.9 1.8a8.82 8.82 0 0 1 0 1.56Z" stroke-width="1.2"/></svg>
-    Settings
-  </a>
-</div>
-""", unsafe_allow_html=True)
+
+st.markdown('<div class="nav" id="navbar">', unsafe_allow_html=True)
+
+# Home
+st.markdown(f'<div class="nav-btn-container {"active" if current=="Home" else ""}">', unsafe_allow_html=True)
+cols = st.columns([1,1,1,1])
+with cols[0]:
+    st.markdown('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:22px;height:22px;margin:0 auto;display:block"><path d="M3 9.5 12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V9.5z" stroke-width="1.7"/></svg>', unsafe_allow_html=True)
+    if st.button("Home", key="nav_home", use_container_width=True):
+        goto("Home")
+
+# Check
+with cols[1]:
+    st.markdown(f'</div><div class="nav-btn-container {"active" if current=="Check" else ""}">', unsafe_allow_html=True)
+    st.markdown('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:22px;height:22px;margin:0 auto;display:block"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.33 0-8 2.17-8 5v1h16v-1c0-2.83-3.67-5-8-5Z" stroke-width="1.7"/></svg>', unsafe_allow_html=True)
+    if st.button("Check", key="nav_check", use_container_width=True):
+        goto("Check")
+
+# History
+with cols[2]:
+    st.markdown(f'</div><div class="nav-btn-container {"active" if current=="History" else ""}">', unsafe_allow_html=True)
+    st.markdown('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:22px;height:22px;margin:0 auto;display:block"><path d="M3 5h18M3 12h18M3 19h18" stroke-width="1.7"/></svg>', unsafe_allow_html=True)
+    if st.button("History", key="nav_history", use_container_width=True):
+        goto("History")
+
+# Settings
+with cols[3]:
+    st.markdown(f'</div><div class="nav-btn-container {"active" if current=="Settings" else ""}">', unsafe_allow_html=True)
+    st.markdown('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:22px;height:22px;margin:0 auto;display:block"><path d="M12 15.5a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5Zm7.94-1.5.9 1.56-2.06 3.56-1.8-.66a8.82 8.82 0 0 1-1.56.9l-.27 1.91H8.85l-.27-1.91a8.82 8.82 0 0 1-1.56-.9l-1.8.66L3.16 15.6l.9-1.56a8.82 8.82 0 0 1 0 1.56L3.16 10.9l2.06-3.56 1.8.66a8.82 8.82 0 0 1 1.56.9l1.8-.66 2.06 3.56-.9 1.8a8.82 8.82 0 0 1 0 1.56Z" stroke-width="1.2"/></svg>', unsafe_allow_html=True)
+    if st.button("Settings", key="nav_settings", use_container_width=True):
+        goto("Settings")
+
+st.markdown('</div></div>', unsafe_allow_html=True)
