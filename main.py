@@ -1,402 +1,236 @@
-# app.py — Mobile-first UI with bottom nav (URL-driven, same-tab), no JS/forms
-import os, io, json, html, time
-from typing import Any, Dict, List, Optional
-from PIL import Image, UnidentifiedImageError
+import os, io, json, html
+from PIL import Image
 import streamlit as st
 from google import genai
 from google.genai import errors
 
-# ---------- Page ----------
-st.set_page_config(page_title="Hair Check", page_icon="✂️", layout="wide")
+# ===================== Mobile-first config & CSS =====================
+st.set_page_config(page_title="ตรวจทรงผมนักเรียน", page_icon="✂️", layout="wide")
 
-# ---------- CSS ----------
-st.markdown("""
+MOBILE_CSS = """
 <style>
-:root{
-  --bg:#f6f7fb; --card:#ffffff; --ink:#0f172a; --muted:#64748b; --br:#e5e7eb;
-  --ok:#10b981; --no:#ef4444; --unsure:#f59e0b;
-  --b1:#667eea; --b2:#764ba2; --active:#4f46e5;
-}
-html,body,[class*="css"]{
-  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui;
-  color:var(--ink); font-size:16px;
-}
-div.block-container{max-width:720px; padding:1rem 1rem 5.5rem; background:var(--bg);}
-a{color:inherit; text-decoration:none}
+html, body, [class*="css"]  { font-size: 18px; }
+div.block-container { padding-top: 0.8rem; padding-bottom: 3rem; }
 
-/* App bar */
-.appbar{
-  position:sticky; top:0; z-index:5;
-  background:linear-gradient(135deg,var(--b1),var(--b2));
-  padding:14px 16px; border-radius:16px; color:#fff;
-  display:flex; align-items:center; gap:10px;
-  box-shadow:0 6px 28px rgba(102,126,234,.25); margin-bottom:14px
-}
-.appbar h1{font-size:20px; margin:0; font-weight:900; letter-spacing:.3px}
-
-/* Home big cards */
-.bigbtn{
-  display:block; background:var(--card); border-radius:16px; padding:18px;
-  border:1px solid var(--br); box-shadow:0 2px 12px rgba(0,0,0,.05);
-  font-weight:800; text-align:left
-}
-.bigbtn small{display:block; color:var(--muted); font-weight:600}
-
-/* Cards / lists */
-.card{background:var(--card); border:1px solid var(--br); border-radius:16px; padding:14px; box-shadow:0 2px 12px rgba(0,0,0,.05)}
-.row{display:flex; gap:12px; align-items:center}
-.avatar{width:48px; height:48px; border-radius:12px; background:#e5e7eb}
-.meta{color:var(--muted); font-size:13px}
-
-/* Chips */
-.chips{display:flex; gap:8px; flex-wrap:wrap}
-.chip{
-  padding:6px 10px; border-radius:999px; background:#eef2ff; color:#3730a3;
-  font-weight:700; font-size:12px; border:1px solid #e0e7ff
+.stButton>button {
+  width: 100%;
+  padding: 0.9rem 1.1rem;
+  font-size: 1.1rem;
+  border-radius: 14px;
 }
 
-/* Camera widget */
-[data-testid="stCameraInput"]{position:relative; display:inline-block; width:100%}
-[data-testid="stCameraInput"] video, [data-testid="stCameraInput"] img{
-  width:100%; border-radius:16px; box-shadow:0 4px 20px rgba(0,0,0,.08)
+.result-card {
+  border-radius: 16px;
+  padding: 1rem 1.1rem;
+  margin-top: 0.5rem;
+  border: 1px solid rgba(0,0,0,0.08);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.06);
 }
-
-/* Overlay corners */
-.overlay{pointer-events:none; position:relative; margin-top:-56px; height:0}
-.corner{position:absolute; width:48px; height:48px; border:3px solid #fff; opacity:.95; border-radius:12px}
-.tl{left:18px; top:-290px; border-right:none;border-bottom:none}
-.tr{right:18px; top:-290px; border-left:none;border-bottom:none}
-.bl{left:18px; top:-56px; border-right:none;border-top:none}
-.br{right:18px; top:-56px; border-left:none;border-top:none}
-
-/* Buttons */
-.stButton > button{width:100%; padding:14px 16px; border-radius:14px; font-weight:800; box-shadow:0 2px 12px rgba(0,0,0,.08)}
-.btn-primary{background:linear-gradient(135deg,var(--b1),var(--b2)) !important; color:#fff !important; border:none !important}
-.btn-muted{background:#e5e7eb !important; color:#111827 !important; border:none !important}
-
-/* Result card */
-.badge{display:inline-flex;align-items:center;gap:8px; padding:6px 12px; border-radius:999px; color:#fff; font-weight:900}
-.badge.ok{background:var(--ok)} .badge.no{background:var(--no)} .badge.unsure{background:var(--unsure)}
-.result{background:var(--card); border:1px solid var(--br); border-radius:16px; padding:14px; box-shadow:0 2px 12px rgba(0,0,0,.05)}
-.result h3{margin:.2rem 0 .3rem 0}
-
-/* Bottom nav */
-.nav{
-  position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--br);
-  display:flex; justify-content:space-around; padding:8px 4px; z-index:10
+.badge {
+  display:inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #fff;
 }
-.nav a{
-  background:none; border:none; padding:6px 10px; display:flex; flex-direction:column; align-items:center;
-  gap:2px; color:#0f172a; font-size:12px; border-radius:10px; text-decoration:none;
-}
-.nav a.active{ color:var(--active); font-weight:900; background:rgba(79,70,229,.08); }
-.nav svg{width:22px; height:22px; display:block}
+.badge-ok { background: #16a34a; }       /* compliant */
+.badge-no { background: #dc2626; }       /* non_compliant */
+.badge-unsure { background: #f59e0b; }   /* unsure */
 
-/* Nav button styling */
-.nav-btn-container button {
-    background: none !important;
-    border: none !important;
-    padding: 6px 10px !important;
-    color: #0f172a !important;
-    font-size: 12px !important;
-    box-shadow: none !important;
-    font-weight: 600 !important;
-    border-radius: 10px !important;
-}
-.nav-btn-container.active button {
-    color: var(--active) !important;
-    font-weight: 900 !important;
-    background: rgba(79,70,229,.08) !important;
-}
+[data-testid="stCameraInputLabel"] { font-size: 1.05rem; }
+textarea, input, .stTextInput input { font-size: 1rem !important; }
+details > summary { font-size: 1.0rem; }
 </style>
-""", unsafe_allow_html=True)
+"""
+st.markdown(MOBILE_CSS, unsafe_allow_html=True)
 
-# ---------- Defaults / Schema ----------
-DEFAULT_RULES = (
-    "กฎระเบียบทรงผม (ชาย)\n"
-    "1) รองทรงสูง ด้านข้าง/ด้านหลังสั้น\n"
-    "2) ด้านบนยาวไม่เกิน 5 ซม.\n"
-    "3) ห้ามย้อม/ดัด/ไว้หนวดเครา\n"
-)
-SCHEMA_HINT = (
-    'จงตอบเป็น JSON เท่านั้น ตามสคีมา:\n'
-    '{"verdict":"compliant | non_compliant | unsure","reasons":["string"],'
-    '"violations":[{"code":"STRING","message":"STRING"}],"confidence":0.0,'
-    '"meta":{"rule_set_id":"default-v1","timestamp":"AUTO"}}'
-)
+# ===================== Default rules & schema hint =====================
+RULE_TEXT = """\
+กฎระเบียบทรงผม (ชาย):
+1) รองทรงสูง ด้านข้าง/ด้านหลังสั้น
+2) ด้านบนยาวไม่เกิน 5 ซม.
+3) ห้ามย้อม/ดัด/ไว้หนวดเครา
+"""
 
-# ---------- URL helpers (same-tab navigation via query params) ----------
-def _get_qp() -> Dict[str, str]:
-    if hasattr(st, "query_params"):
-        # Streamlit ใหม่: behaves like dict[str, str]
-        return dict(st.query_params)
-    return {k: v[0] for k, v in st.experimental_get_query_params().items()}  # type: ignore
+SCHEMA_HINT = """\
+จงตอบเป็น JSON เท่านั้น ตามสคีมา:
+{
+  "verdict": "compliant | non_compliant | unsure",
+  "reasons": ["string"],
+  "violations": [{"code":"STRING","message":"STRING"}],
+  "confidence": 0.0,
+  "meta": {"student_id":"STRING","rule_set_id":"default-v1","timestamp":"AUTO"}
+}
+"""
 
-def _set_qp(**kwargs):
-    if hasattr(st, "query_params"):
-        st.query_params.clear()
-        for k, v in kwargs.items():
-            st.query_params[k] = v
-    else:
-        st.experimental_set_query_params(**kwargs)  # type: ignore
+# ===================== Utils =====================
+def esc(s: object) -> str:
+    """HTML-escape ปลอดภัยสำหรับแสดงใน st.markdown(unsafe_allow_html=True)"""
+    return html.escape(str(s), quote=True)
 
-def goto(tab: str):
-    st.session_state.tab = tab
-    _set_qp(tab=tab)
-    st.rerun()  # Force reload to apply changes
+def verdict_badge(verdict: str) -> str:
+    mp = {
+        "compliant": ("ผ่านระเบียบ", "badge-ok"),
+        "non_compliant": ("ผิดระเบียบ", "badge-no"),
+        "unsure": ("ไม่แน่ใจ", "badge-unsure"),
+    }
+    label, css = mp.get(verdict, ("ไม่แน่ใจ", "badge-unsure"))
+    return f'<span class="badge {css}">{label}</span>'
 
-# ---------- Utils ----------
-def esc(x: Any) -> str:
-    return html.escape(str(x), quote=True)
-
-def compress(img: Image.Image, mime: str) -> bytes:
-    img = img.copy(); img.thumbnail((1024,1024))
+def compress_for_network(img: Image.Image, mime: str) -> bytes:
+    """ลดขนาดภาพ (เร็วขึ้น/ประหยัดเน็ต) โดยคง MIME ที่จะส่งไปโมเดล"""
+    img = img.copy()
+    img.thumbnail((1024, 1024))
     buf = io.BytesIO()
     if mime == "image/png":
-        img.save(buf, "PNG", optimize=True)
+        img.save(buf, format="PNG", optimize=True)
     else:
-        img.save(buf, "JPEG", quality=85, optimize=True)
+        img.save(buf, format="JPEG", quality=85, optimize=True)
     return buf.getvalue()
 
-def badge_view(verdict: str) -> str:
-    mapping = {"compliant":("ผ่านระเบียบ","ok"), "non_compliant":("ไม่ผ่านระเบียบ","no"), "unsure":("ไม่แน่ใจ","unsure")}
-    label, cls = mapping.get(verdict, ("ไม่แน่ใจ","unsure"))
-    return f'<span class="badge {cls}">● {label}</span>'
-
-def parse_json_strict(text: str) -> Dict[str, Any]:
-    s, e = text.find("{"), text.rfind("}")
-    if s == -1 or e == -1:
-        raise ValueError("no JSON object found")
-    return json.loads(text[s:e+1])
-
-# ---------- Secrets / Client ----------
-def _get_env_api_key() -> Optional[str]:
-    key = os.getenv("GEMINI_API_KEY")
-    if key:
-        return key
+# ===================== Gemini Caller (with retry & fallback) =====================
+def call_gemini(image_bytes: bytes, mime: str, student_id: str, rules: str, retries: int = 2):
+    # ลำดับหา API key: st.secrets -> ENV
+    api_key = None
     try:
-        if hasattr(st, "secrets") and st.secrets:
-            return st.secrets.get("GEMINI_API_KEY", None)  # type: ignore[attr-defined]
+        api_key = st.secrets.get("GEMINI_API_KEY")
     except Exception:
         pass
-    return None
-
-@st.cache_resource(show_spinner=False)
-def get_gemini_client() -> Optional[genai.Client]:
-    api_key = _get_env_api_key()
+    api_key = api_key or os.getenv("GEMINI_API_KEY")
     if not api_key:
-        return None
-    return genai.Client(api_key=api_key)
+        raise ValueError("GEMINI_API_KEY not set (set in Secrets or environment).")
 
-# ---------- Gemini ----------
-def call_gemini(image_bytes: bytes, mime: str, rules_text: str, retries: int = 2) -> Dict[str, Any]:
-    client = get_gemini_client()
-    if not client:
-        return {"verdict":"unsure","reasons":["ยังไม่ได้ตั้งค่า GEMINI_API_KEY"],"violations":[],"confidence":0.0,"meta":{"rule_set_id":"default-v1"}}
+    client = genai.Client(api_key=api_key)
 
-    prompt = f"""คุณเป็นผู้ช่วยตรวจทรงผมนักเรียน ให้ตอบเป็น JSON เท่านั้น
+    prompt = f"""
+SYSTEM:
+คุณเป็นตัวตรวจสอบทรงผมนักเรียน ตอบเป็น JSON เท่านั้น ห้ามมีข้อความอื่น
 
-ตรวจรูปนี้ตามกฎ:
-{rules_text}
+USER:
+วิเคราะห์รูปทรงผมนักเรียนตามกฎต่อไปนี้ (ภาษาไทย):
+{rules}
 
 {SCHEMA_HINT}
-- ถ้ารูปไม่ชัด ให้ verdict="unsure" พร้อมเหตุผล
+
+ข้อควรระวัง: หากรูปไม่ชัด ให้ verdict="unsure" พร้อมเหตุผล
+student_id = {student_id or "UNKNOWN"}
+rule_set_id = "default-v1"
 """
+
     last_err = None
     for i in range(retries):
         try:
             resp = client.models.generate_content(
                 model="gemini-2.5-flash",
-                contents=[{"role": "user", "parts": [
-                    {"text": prompt},
-                    {"inline_data": {"mime_type": mime, "data": image_bytes}}
-                ]}],
+                contents=[{
+                    "role": "user",
+                    "parts": [
+                        {"text": prompt},
+                        {"inline_data": {"mime_type": mime, "data": image_bytes}}
+                    ]
+                }],
             )
-            raw = (resp.text or "").strip()
-            try:
-                return parse_json_strict(raw)
-            except Exception as pe:
-                return {"verdict":"unsure","reasons":[f"ผลไม่ใช่ JSON ล้วน: {pe}", raw[:200]],
-                        "violations":[],"confidence":0.0,"meta":{"rule_set_id":"default-v1"}}
+            text = (resp.text or "").strip()
+            s, e = text.find("{"), text.rfind("}")
+            return json.loads(text[s:e+1])
         except errors.ServerError as e:
             last_err = e
-            if "503" in str(e) and i < retries-1:
-                time.sleep(2*(i+1)); continue
+            if "503" in str(e) and i < retries - 1:
+                st.toast("เซิร์ฟเวอร์แออัด (503) กำลังลองใหม่…", icon="⏳")
+                import time; time.sleep(2 * (i + 1))
+                continue
             break
         except Exception as e:
-            last_err = e; break
-    return {"verdict":"unsure","reasons":[f"เกิดข้อผิดพลาด: {last_err}"],"violations":[],"confidence":0.0,"meta":{"rule_set_id":"default-v1"}}
+            last_err = e
+            break
 
-# ---------- App state ----------
-if "tab" not in st.session_state:
-    st.session_state.tab = "Home"
-if "history" not in st.session_state:
-    st.session_state.history: List[Dict[str,Any]] = []
-if "rules_text" not in st.session_state:
-    st.session_state.rules_text = DEFAULT_RULES
+    return {
+        "verdict": "unsure",
+        "reasons": [f"เกิดข้อผิดพลาดระหว่างเรียกโมเดล: {last_err}"],
+        "violations": [],
+        "confidence": 0.0,
+        "meta": {"student_id": student_id or "UNKNOWN", "rule_set_id": "default-v1"}
+    }
 
-# sync from URL (same tab, no popup)
-_qp = _get_qp()
-if "tab" in _qp and _qp["tab"]:
-    st.session_state.tab = _qp["tab"]
+# ===================== UI =====================
+st.markdown("### ✂️ ตรวจทรงผมนักเรียนด้วย Gemini (เหมาะกับมือถือ)")
 
-# ---------- AppBar ----------
-st.markdown('<div class="appbar"><h1>Pet-style Hair Check</h1></div>', unsafe_allow_html=True)
+colA, colB = st.columns([1, 1])
+with colA:
+    student_id = st.text_input("รหัสนักเรียน", placeholder="ใส่รหัสหรือเว้นว่าง", label_visibility="visible")
+with colB:
+    auto_analyze = st.toggle("วิเคราะห์อัตโนมัติหลังถ่าย", value=True)
 
-# ---------- Pages ----------
-def page_home():
-    st.markdown('<a class="bigbtn" href="#" onclick="return false;">🧑‍🎓 ตรวจทรงผมของนักเรียน<small>เปิดกล้องและวิเคราะห์อัตโนมัติ</small></a>', unsafe_allow_html=True)
-    st.markdown("")
-    st.markdown('<a class="bigbtn" href="#" onclick="return false;">🗂️ ดูประวัติการตรวจ<small>ผลล่าสุดและรายละเอียด</small></a>', unsafe_allow_html=True)
-    c1, c2 = st.columns(2)
-    with c1:
-        if st.button("เริ่มตรวจตอนนี้", use_container_width=True, key="cta_start"):
-            goto("Check")
-    with c2:
-        if st.button("เปิดดูประวัติ", use_container_width=True, key="cta_hist"):
-            goto("History")
+with st.expander("กฎระเบียบ (แตะเพื่อแก้ไข)"):
+    rules = st.text_area("RULES", RULE_TEXT, height=120)
 
-def page_check():
-    st.text_input("ค้นหาสถานที่/ห้องเรียน (ตัวอย่าง UI เท่านั้น)", placeholder="เช่น อาคาร A ห้อง 201", key="search_room")
-    st.markdown('<div class="chips">'+ ''.join(f'<span class="chip">{x}</span>' for x in ["แสงเพียงพอ","เห็นหู","ไม่ย้อนแสง","ถือให้มั่นคง"]) +'</div>', unsafe_allow_html=True)
+st.caption("• อนุญาตการเข้าถึงกล้องในเบราว์เซอร์ • จัดแสงให้เพียงพอ • ให้เห็นทรงผมชัดเจน")
+photo = st.camera_input("ถ่ายภาพด้วยกล้อง")
 
-    photo = st.camera_input("ถ่ายภาพทรงผม", key="cam_input")
-    st.markdown('<div class="overlay"><span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span></div>', unsafe_allow_html=True)
+if "last_result" not in st.session_state:
+    st.session_state.last_result = None
 
-    if photo is None:
-        st.info("หากกล้องไม่ขึ้น: ใช้ HTTPS หรือ localhost และอนุญาตสิทธิ์กล้องในเบราว์เซอร์")
-        return
-
+if photo:
     try:
         img = Image.open(photo).convert("RGB")
-    except UnidentifiedImageError:
-        st.error("ไม่สามารถอ่านไฟล์ภาพได้")
-        return
+        mime = photo.type if photo.type in ("image/png", "image/jpeg") else "image/jpeg"
+        st.image(img, caption="ภาพล่าสุด", use_container_width=True)
 
-    mime = photo.type if photo.type in ("image/png","image/jpeg") else "image/jpeg"
-    st.image(img, caption="ภาพที่ถ่าย", use_container_width=True)
+        c1, c2 = st.columns(2)
+        with c1:
+            do_analyze = st.button("🔎 วิเคราะห์", use_container_width=True) or (auto_analyze and st.session_state.last_result is None)
+        with c2:
+            clear = st.button("🗑️ ถ่ายใหม่/ล้างผล", use_container_width=True)
 
-    data = compress(img, mime)
-    if len(data) > 5*1024*1024:
-        img2 = img.copy(); img2.thumbnail((800,800)); data = compress(img2, mime)
-
-    with st.spinner("กำลังวิเคราะห์…"):
-        res = call_gemini(data, mime, st.session_state.rules_text)
-
-    # เก็บประวัติ (cap 100)
-    st.session_state.history.insert(0, {"time": time.strftime("%Y-%m-%d %H:%M"), "result": res})
-    if len(st.session_state.history) > 100:
-        st.session_state.history = st.session_state.history[:100]
-
-    verdict = res.get("verdict","unsure")
-    reasons = res.get("reasons",[]) or []
-    violations = res.get("violations",[]) or []
-    conf = float(res.get("confidence",0.0) or 0.0)
-
-    st.markdown('<div class="result">', unsafe_allow_html=True)
-    st.markdown(f'<div class="row" style="justify-content:space-between;"><h3>ผลการตรวจ</h3>{badge_view(verdict)}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="meta">ความมั่นใจ: <b>{conf:.1%}</b></div>', unsafe_allow_html=True)
-    if reasons:
-        st.markdown('<div style="margin:.6rem 0 .2rem;font-weight:800;">เหตุผล</div>', unsafe_allow_html=True)
-        st.markdown('<ul>'+ ''.join(f'<li>{esc(x)}</li>' for x in reasons) +'</ul>', unsafe_allow_html=True)
-    if violations:
-        st.markdown('<div style="margin:.6rem 0 .2rem;font-weight:800;">จุดที่ไม่ตรงระเบียบ</div>', unsafe_allow_html=True)
-        st.markdown('<ul>'+ ''.join(f'<li>{esc(v.get("message",""))}</li>' for v in violations) +'</ul>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.download_button("ดาวน์โหลดผลลัพธ์ (JSON)", data=json.dumps(res, ensure_ascii=False, indent=2),
-                       file_name="haircheck_result.json", mime="application/json", use_container_width=True)
-    if st.button("ลบและถ่ายใหม่", type="secondary", use_container_width=True):
-        goto("Check")
-
-def page_history():
-    st.markdown('<div class="card"><div class="row"><div class="avatar"></div><div><b>Top rated</b><div class="meta">ผลที่เชื่อถือได้มากสุดล่าสุด</div></div></div></div>', unsafe_allow_html=True)
-    st.write("")
-    if not st.session_state.history:
-        st.info("ยังไม่มีประวัติการตรวจ")
-        return
-    for i, h in enumerate(st.session_state.history[:12], start=1):
-        r = h["result"]; v = r.get("verdict","unsure"); conf = float(r.get("confidence",0.0) or 0.0)
-        st.markdown(f"""
-        <div class="card" style="margin-bottom:10px;">
-          <div class="row" style="justify-content:space-between;">
-            <div><b>ผล #{i}</b><div class="meta">{esc(h['time'])}</div></div>
-            {badge_view(v)}
-          </div>
-          <div class="meta" style="margin-top:6px;">ความมั่นใจ {conf:.1%}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-def page_settings():
-    st.markdown('<div class="card"><b>กฎระเบียบทรงผม</b><div class="meta">ปรับข้อความกฎตามสถานศึกษา</div></div>', unsafe_allow_html=True)
-    
-    new_rules = st.text_area("RULES (ตัวอย่างค่าเริ่มต้น)", 
-                              value=st.session_state.rules_text, 
-                              height=120, 
-                              key="rules_text_input")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("บันทึก", use_container_width=True, type="primary"):
-            st.session_state.rules_text = new_rules
-            st.success("✅ บันทึกสำเร็จ!")
-    with col2:
-        if st.button("รีเซ็ต", use_container_width=True):
-            st.session_state.rules_text = DEFAULT_RULES
+        if clear:
+            st.session_state.last_result = None
             st.rerun()
-    
-    st.caption("💡 ใส่ GEMINI_API_KEY ใน Secrets หรือ environment เพื่อใช้งานจริง")
-    
-    # แสดงสถานะ API
-    client = get_gemini_client()
-    if client:
-        st.success("🔑 API Key: พร้อมใช้งาน")
-    else:
-        st.warning("⚠️ ยังไม่ได้ตั้งค่า API Key")
 
-# ---------- Router ----------
-tab = st.session_state.tab
-if tab == "Home":
-    page_home()
-elif tab == "Check":
-    page_check()
-elif tab == "History":
-    page_history()
-else:
-    page_settings()
+        if do_analyze:
+            with st.spinner("กำลังวิเคราะห์…"):
+                image_bytes = compress_for_network(img, mime)
+                st.session_state.last_result = call_gemini(
+                    image_bytes, mime=mime, student_id=student_id, rules=rules
+                )
 
-# ---------- Bottom Nav (same-tab navigation with buttons styled as links) ----------
-current = st.session_state.tab
+    except Exception as e:
+        st.error(f"ไม่สามารถอ่านภาพจากกล้องได้: {e}")
 
-st.markdown('<div class="nav" id="navbar">', unsafe_allow_html=True)
+# แสดงผลลัพธ์แบบการ์ด
+if st.session_state.last_result:
+    r = st.session_state.last_result
+    verdict = r.get("verdict", "unsure")
+    reasons = r.get("reasons", []) or []
+    violations = r.get("violations", []) or []
+    conf = r.get("confidence", 0.0)
+    meta = r.get("meta", {}) or {}
 
-# Home
-st.markdown(f'<div class="nav-btn-container {"active" if current=="Home" else ""}">', unsafe_allow_html=True)
-cols = st.columns([1,1,1,1])
-with cols[0]:
-    st.markdown('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:22px;height:22px;margin:0 auto;display:block"><path d="M3 9.5 12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V9.5z" stroke-width="1.7"/></svg>', unsafe_allow_html=True)
-    if st.button("Home", key="nav_home", use_container_width=True):
-        goto("Home")
+    st.markdown(
+        f"""
+        <div class="result-card">
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+            <div style="font-weight:700;font-size:1.05rem;">ผลการประเมิน</div>
+            <div>{verdict_badge(verdict)}</div>
+          </div>
+          <div style="margin-top:6px;color:#475569;">ความเชื่อมั่น: <b>{conf:.2f}</b></div>
+          <hr style="opacity:.1;margin:10px 0;">
+          <div style="font-weight:600;margin-bottom:6px;">เหตุผล</div>
+          <ul style="margin-top:0;">
+            {''.join(f'<li>{esc(x)}</li>' for x in reasons)}
+          </ul>
+          {"<div style='font-weight:600;margin-top:8px;'>ข้อผิดระเบียบ</div><ul>" + ''.join(f"<li>{esc(v.get('message',''))}</li>" for v in violations) + "</ul>" if violations else ""}
+          <div style="margin-top:6px;color:#64748b;">รหัสนักเรียน: <b>{esc(meta.get('student_id','-'))}</b> • ชุดกฎ: <b>{esc(meta.get('rule_set_id','default-v1'))}</b></div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-# Check
-with cols[1]:
-    st.markdown(f'</div><div class="nav-btn-container {"active" if current=="Check" else ""}">', unsafe_allow_html=True)
-    st.markdown('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:22px;height:22px;margin:0 auto;display:block"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.33 0-8 2.17-8 5v1h16v-1c0-2.83-3.67-5-8-5Z" stroke-width="1.7"/></svg>', unsafe_allow_html=True)
-    if st.button("Check", key="nav_check", use_container_width=True):
-        goto("Check")
-
-# History
-with cols[2]:
-    st.markdown(f'</div><div class="nav-btn-container {"active" if current=="History" else ""}">', unsafe_allow_html=True)
-    st.markdown('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:22px;height:22px;margin:0 auto;display:block"><path d="M3 5h18M3 12h18M3 19h18" stroke-width="1.7"/></svg>', unsafe_allow_html=True)
-    if st.button("History", key="nav_history", use_container_width=True):
-        goto("History")
-
-# Settings
-with cols[3]:
-    st.markdown(f'</div><div class="nav-btn-container {"active" if current=="Settings" else ""}">', unsafe_allow_html=True)
-    st.markdown('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:22px;height:22px;margin:0 auto;display:block"><path d="M12 15.5a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5Zm7.94-1.5.9 1.56-2.06 3.56-1.8-.66a8.82 8.82 0 0 1-1.56.9l-.27 1.91H8.85l-.27-1.91a8.82 8.82 0 0 1-1.56-.9l-1.8.66L3.16 15.6l.9-1.56a8.82 8.82 0 0 1 0 1.56L3.16 10.9l2.06-3.56 1.8.66a8.82 8.82 0 0 1 1.56.9l1.8-.66 2.06 3.56-.9 1.8a8.82 8.82 0 0 1 0 1.56Z" stroke-width="1.2"/></svg>', unsafe_allow_html=True)
-    if st.button("Settings", key="nav_settings", use_container_width=True):
-        goto("Settings")
-
-st.markdown('</div></div>', unsafe_allow_html=True)
+st.markdown(
+    """
+    <div style="margin-top:1.2rem;color:#64748b;font-size:0.95rem;">
+      เคล็ดลับ: จับมือถือให้นิ่ง, จัดแสงหน้า-ข้าง, ให้เห็นข้างศีรษะชัดเจน
+    </div>
+    """,
+    unsafe_allow_html=True
+)
