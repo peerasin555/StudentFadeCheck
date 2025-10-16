@@ -1,4 +1,4 @@
-# app.py — Bottom nav stays in the same tab (target="_self" + JS intercept), full code
+# app.py — Mobile-first UI, bottom nav with SVG icons, in-tab page switch
 import os, io, json, html, time
 from typing import Any, Dict, List
 from PIL import Image
@@ -6,10 +6,10 @@ import streamlit as st
 from google import genai
 from google.genai import errors
 
-# ---------------- Page ----------------
+# ---------- Page ----------
 st.set_page_config(page_title="Hair Check", page_icon="✂️", layout="wide")
 
-# ---------------- CSS ----------------
+# ---------- CSS ----------
 st.markdown("""
 <style>
 :root{
@@ -17,30 +17,24 @@ st.markdown("""
   --ok:#10b981; --no:#ef4444; --unsure:#f59e0b;
   --b1:#667eea; --b2:#764ba2; --active:#4f46e5;
 }
-html,body,[class*="css"]{
-  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui;
-  color:var(--ink); font-size:16px;
-}
+html,body,[class*="css"]{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,system-ui;
+  color:var(--ink); font-size:16px;}
 div.block-container{max-width:720px; padding:1rem 1rem 5.5rem; background:var(--bg);}
 a{color:inherit; text-decoration:none}
 
 /* App bar */
-.appbar{
-  position:sticky; top:0; z-index:5; background:linear-gradient(135deg,var(--b1),var(--b2));
+.appbar{position:sticky; top:0; z-index:5; background:linear-gradient(135deg,var(--b1),var(--b2));
   padding:14px 16px; border-radius:16px; color:#fff; display:flex; align-items:center; gap:10px;
-  box-shadow:0 6px 28px rgba(102,126,234,.25); margin-bottom:14px
-}
+  box-shadow:0 6px 28px rgba(102,126,234,.25); margin-bottom:14px}
 .appbar h1{font-size:20px; margin:0; font-weight:900; letter-spacing:.3px}
 
 /* Home big cards */
-.bigbtn{
-  display:block; background:var(--card); border-radius:16px; padding:18px; border:1px solid var(--br);
-  box-shadow:0 2px 12px rgba(0,0,0,.05); font-weight:800; text-align:left
-}
+.bigbtn{display:block; background:var(--card); border-radius:16px; padding:18px; border:1px solid var(--br);
+  box-shadow:0 2px 12px rgba(0,0,0,.05); font-weight:800; text-align:left}
 .bigbtn small{display:block; color:var(--muted); font-weight:600}
 
 /* Cards / lists */
-.card{background:var(--card); border:1px solid var(--br); border-radius:16px; padding:14px 14px; box-shadow:0 2px 12px rgba(0,0,0,.05)}
+.card{background:var(--card); border:1px solid var(--br); border-radius:16px; padding:14px 14px; box-shadow:0 2px 12px rgba(0,0,0,.05);}
 .row{display:flex; gap:12px; align-items:center}
 .avatar{width:48px; height:48px; border-radius:12px; background:#e5e7eb}
 .meta{color:var(--muted); font-size:13px}
@@ -72,21 +66,19 @@ a{color:inherit; text-decoration:none}
 .result{background:var(--card); border:1px solid var(--br); border-radius:16px; padding:14px; box-shadow:0 2px 12px rgba(0,0,0,.05)}
 .result h3{margin:.2rem 0 .3rem 0}
 
-/* Bottom nav (anchors + target=_self) */
-.nav{
-  position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--br);
-  display:flex; justify-content:space-around; padding:8px 4px; z-index:10
+/* Bottom nav */
+.nav{position:fixed; left:0; right:0; bottom:0; background:#fff; border-top:1px solid var(--br);
+  display:flex; justify-content:space-around; padding:8px 4px; z-index:10}
+.nav button{
+  background:none; border:none; padding:6px 10px; display:flex; flex-direction:column; align-items:center;
+  gap:2px; color:#0f172a; font-size:12px; cursor:pointer; border-radius:10px;
 }
-.nav a{
-  display:flex; flex-direction:column; align-items:center; gap:2px; padding:6px 10px;
-  color:#0f172a; font-size:12px; border-radius:10px;
-}
-.nav a.active{ color:var(--active); font-weight:900; background:rgba(79,70,229,.08) }
+.nav button.active{ color:var(--active); font-weight:900; background:rgba(79,70,229,.08); }
 .nav svg{width:22px; height:22px; display:block}
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------- Shared contents ----------------
+# ---------- Shared contents ----------
 RULES = (
     "กฎระเบียบทรงผม (ชาย)\n"
     "1) รองทรงสูง ด้านข้าง/ด้านหลังสั้น\n"
@@ -95,31 +87,24 @@ RULES = (
 )
 SCHEMA_HINT = (
     'จงตอบเป็น JSON เท่านั้น ตามสคีมา:\n'
-    '{"verdict":"compliant | non_compliant | unsure","reasons"🙁"string"],'
+    '{"verdict":"compliant | non_compliant | unsure","reasons":["string"],'
     '"violations":[{"code":"STRING","message":"STRING"}],"confidence":0.0,'
     '"meta":{"rule_set_id":"default-v1","timestamp":"AUTO"}}'
 )
 
-# ---------------- Utils ----------------
+# ---------- Utils ----------
 def esc(x: Any) -> str:
     return html.escape(str(x), quote=True)
 
 def compress(img: Image.Image, mime: str) -> bytes:
-    img = img.copy()
-    img.thumbnail((1024,1024))
+    img = img.copy(); img.thumbnail((1024,1024))
     buf = io.BytesIO()
-    if mime == "image/png":
-        img.save(buf,"PNG",optimize=True)
-    else:
-        img.save(buf,"JPEG",quality=85, optimize=True)
+    if mime == "image/png": img.save(buf,"PNG",optimize=True)
+    else: img.save(buf,"JPEG",quality=85, optimize=True)
     return buf.getvalue()
 
 def badge_view(verdict: str) -> str:
-    mapping = {
-        "compliant"🙁"ผ่านระเบียบ","ok"),
-        "non_compliant"🙁"ไม่ผ่านระเบียบ","no"),
-        "unsure"🙁"ไม่แน่ใจ","unsure")
-    }
+    mapping = {"compliant":("ผ่านระเบียบ","ok"), "non_compliant":("ไม่ผ่านระเบียบ","no"), "unsure":("ไม่แน่ใจ","unsure")}
     label, cls = mapping.get(verdict, ("ไม่แน่ใจ","unsure"))
     return f'<span class="badge {cls}">● {label}</span>'
 
@@ -129,12 +114,12 @@ def parse_json_strict(text: str) -> Dict[str, Any]:
         raise ValueError("no JSON object found")
     return json.loads(text[s:e+1])
 
-# ---------------- Gemini ----------------
+# ---------- Gemini ----------
 def call_gemini(image_bytes: bytes, mime: str, retries: int = 2) -> Dict[str, Any]:
     api_key = (getattr(st, "secrets", {}).get("GEMINI_API_KEY", None)
                if hasattr(st, "secrets") else None) or os.getenv("GEMINI_API_KEY")
     if not api_key:
-        return {"verdict":"unsure","reasons"🙁"ยังไม่ได้ตั้งค่า GEMINI_API_KEY"],"violations":[],"confidence":0.0,"meta":{"rule_set_id":"default-v1"}}
+        return {"verdict":"unsure","reasons":["ยังไม่ได้ตั้งค่า GEMINI_API_KEY"],"violations":[],"confidence":0.0,"meta":{"rule_set_id":"default-v1"}}
 
     client = genai.Client(api_key=api_key)
     prompt = f"""SYSTEM:
@@ -165,31 +150,31 @@ USER (ไทย):
         except errors.ServerError as e:
             last_err = e
             if "503" in str(e) and i < retries-1:
-                st.info("ระบบหนาแน่น กำลังลองใหม่…")
-                time.sleep(2*(i+1))
-                continue
+                st.info("🔄 ระบบหนาแน่น กำลังลองใหม่…"); time.sleep(2*(i+1)); continue
             break
         except Exception as e:
-            last_err = e
-            break
+            last_err = e; break
     return {"verdict":"unsure","reasons":[f"เกิดข้อผิดพลาด: {last_err}"],"violations":[],"confidence":0.0,"meta":{"rule_set_id":"default-v1"}}
 
-# ---------------- Router via query param (same tab) ----------------
-qp = st.query_params
-tab = qp.get("tab", "Home")  # default
+# ---------- App state ----------
+if "tab" not in st.session_state: st.session_state.tab = "Home"
+if "history" not in st.session_state: st.session_state.history: List[Dict[str,Any]] = []
 
-# ---------------- App bar ----------------
-st.markdown('<div class="appbar"><h1>Hair Check</h1></div>', unsafe_allow_html=True)
+# ---------- AppBar ----------
+st.markdown('<div class="appbar"><h1>Pet-style Hair Check</h1></div>', unsafe_allow_html=True)
 
-# ---------------- State ----------------
-if "history" not in st.session_state:
-    st.session_state.history: List[Dict[str,Any]] = []
-
-# ---------------- Pages ----------------
+# ---------- Pages ----------
 def page_home():
-    st.markdown('<a class="bigbtn" href="?tab=Check" target="_self">ตรวจทรงผมของนักเรียน<small>เปิดกล้องและวิเคราะห์อัตโนมัติ</small></a>', unsafe_allow_html=True)
+    st.markdown('<a class="bigbtn" href="#" onclick="return false;">🧑‍🎓 ตรวจทรงผมของนักเรียน<small>เปิดกล้องและวิเคราะห์อัตโนมัติ</small></a>', unsafe_allow_html=True)
     st.markdown("")
-    st.markdown('<a class="bigbtn" href="?tab=History" target="_self">ดูประวัติการตรวจ<small>ผลล่าสุดและรายละเอียด</small></a>', unsafe_allow_html=True)
+    st.markdown('<a class="bigbtn" href="#" onclick="return false;">🗂️ ดูประวัติการตรวจ<small>ผลล่าสุดและรายละเอียด</small></a>', unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("เริ่มตรวจตอนนี้", use_container_width=True, key="cta1"):
+            st.session_state.tab = "Check"; st.rerun()
+    with c2:
+        if st.button("เปิดดูประวัติ", use_container_width=True, key="cta2"):
+            st.session_state.tab = "History"; st.rerun()
 
 def page_check():
     st.text_input("ค้นหาสถานที่/ห้องเรียน (ตัวอย่าง UI เท่านั้น)", placeholder="เช่น อาคาร A ห้อง 201")
@@ -199,7 +184,7 @@ def page_check():
     st.markdown('<div class="overlay"><span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span></div>', unsafe_allow_html=True)
 
     if photo is None:
-        st.info("หากกล้องไม่ขึ้น: ใช้ HTTPS หรือ localhost และอนุญาตสิทธิ์กล้องในเบราว์เซอร์")
+        st.info("ℹ️ หากกล้องไม่ขึ้น: ใช้ HTTPS หรือ localhost และอนุญาตสิทธิ์กล้องในเบราว์เซอร์")
         return
 
     img = Image.open(photo).convert("RGB")
@@ -210,11 +195,13 @@ def page_check():
     if len(data) > 5*1024*1024:
         img2 = img.copy(); img2.thumbnail((800,800)); data = compress(img2, mime)
 
-    with st.spinner("กำลังวิเคราะห์…"):
+    with st.spinner("🤖 กำลังวิเคราะห์…"):
         res = call_gemini(data, mime)
 
+    # เก็บประวัติ
     st.session_state.history.insert(0, {"time": time.strftime("%Y-%m-%d %H:%M"), "result": res})
 
+    # แสดงผล
     v = res.get("verdict","unsure")
     reasons = res.get("reasons",[]) or []
     violations = res.get("violations",[]) or []
@@ -229,8 +216,10 @@ def page_check():
     if violations:
         st.markdown('<div style="margin:.6rem 0 .2rem;font-weight:800;">จุดที่ไม่ตรงระเบียบ</div>', unsafe_allow_html=True)
         st.markdown('<ul>'+ ''.join(f'<li>{esc(v.get("message",""))}</li>' for v in violations) +'</ul>', unsafe_allow_html=True)
-    st.download_button("ดาวน์โหลดผลลัพธ์ (JSON)", data=json.dumps(res, ensure_ascii=False, indent=2),
+    st.download_button("⬇️ ดาวน์โหลดผลลัพธ์ (JSON)", data=json.dumps(res, ensure_ascii=False, indent=2),
                        file_name="haircheck_result.json", mime="application/json", use_container_width=True)
+    st.button("↺ ลบและถ่ายใหม่", type="secondary", use_container_width=True,
+              on_click=lambda: (st.session_state.update({"tab":"Check"}), st.rerun()))
 
 def page_history():
     st.markdown('<div class="card"><div class="row"><div class="avatar"></div><div><b>Top rated</b><div class="meta">ผลที่เชื่อถือได้มากสุดล่าสุด</div></div></div></div>', unsafe_allow_html=True)
@@ -255,51 +244,74 @@ def page_settings():
     st.text_area("RULES (ตัวอย่างค่าเริ่มต้น)", RULES, height=120, key="rules_text")
     st.caption("ใส่ GEMINI_API_KEY ใน Secrets หรือ environment เพื่อใช้งานจริง")
 
-# ---------------- Render page ----------------
-if tab == "Home":
-    page_home()
-elif tab == "Check":
-    page_check()
-elif tab == "History":
-    page_history()
-else:
-    page_settings()
+# ---------- Router ----------
+tab = st.session_state.tab
+if tab == "Home": page_home()
+elif tab == "Check": page_check()
+elif tab == "History": page_history()
+else: page_settings()
 
-# ---------------- Bottom nav (anchors with target=_self + JS to force same-tab) ----------------
-def nav_item(name, icon_svg):
-    active = "active" if tab == name else ""
-    # target="_self" บังคับให้เปิดในแท็บเดิม; data-tab ใช้สำหรับ JS intercept
-    return f'<a class="{active}" href="?tab={name}" target="_self" rel="noopener" data-tab="{name}">{icon_svg}{name}</a>'
+# ---------- Bottom Nav (SVG icons + in-tab switch) ----------
+# ใช้ st.form + hidden buttons เพื่อ trigger rerun แบบไม่มี "ปุ่มล่องหน"
+with st.container():
+    st.markdown("""
+    <div class="nav" id="navbar">
+      <button id="nav-home"   class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9.5 12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V9.5z" stroke-width="1.7"/></svg>Home</button>
+      <button id="nav-check"  class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.33 0-8 2.17-8 5v1h16v-1c0-2.83-3.67-5-8-5Z" stroke-width="1.7"/></svg>Check</button>
+      <button id="nav-history"class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 5h18M3 12h18M3 19h18" stroke-width="1.7"/></svg>History</button>
+      <button id="nav-settings"class=""><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 15.5a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5Zm7.94-1.5.9 1.56-2.06 3.56-1.8-.66a8.82 8.82 0 0 1-1.56.9l-.27 1.91H8.85l-.27-1.91a8.82 8.82 0 0 1-1.56-.9l-1.8.66L3.16 15.6l.9-1.56a8.82 8.82 0 0 1 0-1.56L3.16 10.9l2.06-3.56 1.8.66a8.82 8.82 0 0 1 1.56-.9l.27-1.91h4.34l.27 1.91a8.82 8.82 0 0 1 1.56.9l1.8-.66 2.06 3.56-.9 1.8a8.82 8.82 0 0 1 0 1.56Z" stroke-width="1.2"/></svg>Settings</button>
+    </div>
+    <script>
+      const current = %s;
+      const map = {"Home":"nav-home","Check":"nav-check","History":"nav-history","Settings":"nav-settings"};
+      // set active class
+      Object.entries(map).forEach(([k,id])=>{
+        const el = document.getElementById(id);
+        if(!el) return;
+        if(k===current){ el.classList.add('active'); } else { el.classList.remove('active'); }
+      });
+    </script>
+    """ % (json.dumps(tab)), unsafe_allow_html=True)
 
-svg_home = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 9.5 12 3l9 6.5V21a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V9.5z" stroke-width="1.7"/></svg>'
-svg_check = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5Zm0 2c-4.33 0-8 2.17-8 5v1h16v-1c0-2.83-3.67-5-8-5Z" stroke-width="1.7"/></svg>'
-svg_hist = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 5h18M3 12h18M3 19h18" stroke-width="1.7"/></svg>'
-svg_sett = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 15.5a3.5 3.5 0 1 0-3.5-3.5 3.5 3.5 0 0 0 3.5 3.5Zm7.94-1.5.9 1.56-2.06 3.56-1.8-.66a8.82 8.82 0 0 1-1.56.9l-.27 1.91H8.85l-.27-1.91a8.82 8.82 0 0 1-1.56-.9l-1.8.66L3.16 15.6l.9-1.56a8.82 8.82 0 0 1 0-1.56L3.16 10.9l2.06-3.56 1.8.66a8.82 8.82 0 0 1 1.56-.9l.27-1.91h4.34l.27 1.91a8.82 8.82 0 0 1 1.56.9l1.8-.66 2.06 3.56-.9 1.8a8.82 8.82 0 0 1 0 1.56Z" stroke-width="1.2"/></svg>'
+# ปุ่มควบคุมที่ซ่อน (ใช้ค่า key แตกต่างเพื่อไม่ทับ)
+with st.form("nav_form", clear_on_submit=False):
+    c1, c2, c3, c4 = st.columns(4)
+    go_home   = c1.form_submit_button(" ", use_container_width=True)
+    go_check  = c2.form_submit_button(" ", use_container_width=True)
+    go_hist   = c3.form_submit_button(" ", use_container_width=True)
+    go_set    = c4.form_submit_button(" ", use_container_width=True)
+    # ทำให้ปุ่มมองไม่เห็น (แต่ยังอยู่เพื่อให้ JS click ได้)
+    st.markdown("""
+    <style>
+      form[data-testid="stForm"] button { opacity:0; height:0; padding:0; margin:0; border:0; }
+    </style>
+    """, unsafe_allow_html=True)
 
-st.markdown(f"""
-<div class="nav" id="nav">
-  {nav_item("Home", svg_home)}
-  {nav_item("Check", svg_check)}
-  {nav_item("History", svg_hist)}
-  {nav_item("Settings", svg_sett)}
-</div>
+st.markdown("""
 <script>
-  // บังคับนำทางในแท็บเดิมเสมอ (ป้องกันกรณีบางเบราว์เซอร์ตีความเปิดแท็บใหม่)
-  (function(){
-    var nav = document.getElementById('nav');
-    if(!nav) return;
-    nav.querySelectorAll('a').forEach(function(a){
-      a.addEventListener('click', function(e){
+  const f = window.parent.document.querySelector('form[data-testid="stForm"]');
+  if (f){
+    const btns = f.querySelectorAll('button');
+    const ids = ["nav-home","nav-check","nav-history","nav-settings"];
+    ids.forEach((id, i)=>{
+      const target = document.getElementById(id);
+      if(!target) return;
+      target.addEventListener('click', (e)=>{
         e.preventDefault();
-        var tab = a.getAttribute('data-tab');
-        if(!tab) return;
-        // same-tab navigation by replacing the search query only
-        var url = new URL(window.location.href);
-        url.searchParams.set('tab', tab);
-        window.location.assign(url.toString()); // stays in same tab
+        // trigger i-th hidden submit button to rerun Streamlit
+        btns[i].click();
       });
     });
-  })();
+  }
 </script>
 """, unsafe_allow_html=True)
-```0
+
+# อ่านผลการคลิกจากปุ่มที่ซ่อน
+if go_home:
+    st.session_state.tab = "Home"; st.rerun()
+elif go_check:
+    st.session_state.tab = "Check"; st.rerun()
+elif go_hist:
+    st.session_state.tab = "History"; st.rerun()
+elif go_set:
+    st.session_state.tab = "Settings"; st.rerun()
