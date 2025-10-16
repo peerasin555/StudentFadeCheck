@@ -117,7 +117,7 @@ def call_gemini(image_bytes: bytes, mime: str, retries: int = 2) -> Dict[str, An
     api_key = (getattr(st, "secrets", {}).get("GEMINI_API_KEY", None)
                if hasattr(st, "secrets") else None) or os.getenv("GEMINI_API_KEY")
     if not api_key:
-return {
+          return {
     "verdict": "unsure",
     "reasons": ["ยังไม่ได้ตั้งค่า GEMINI_API_KEY"],
     "violations": [],
@@ -280,5 +280,6 @@ st.markdown(f"""
   })();
 </script>
 """, unsafe_allow_html=True)
+
 
 
